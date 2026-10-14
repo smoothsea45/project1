@@ -13,6 +13,8 @@
   const Decimal = DecimalLibrary.clone({ precision: 256, rounding: DecimalLibrary.ROUND_HALF_UP });
   const FORMAT = 'pharma-cost-web-project';
   const VERSION = 1;
+  const MAX_SCENARIOS = 4;
+  const SCENARIO_LIMIT_MESSAGE = '한 프로젝트의 시나리오는 최대 ' + MAX_SCENARIOS + '개까지 사용할 수 있습니다. 원본 데이터는 변경하지 않았습니다.';
   const UNITS = Object.freeze({
     krw_g: { divisor: '1000', foreign: false },
     krw_kg: { divisor: '1000000', foreign: false },
@@ -58,6 +60,7 @@
 
   function makeProject(options) {
     const supplied = options || {};
+    if (Array.isArray(supplied.scenarios) && supplied.scenarios.length > MAX_SCENARIOS) throw new Error(SCENARIO_LIMIT_MESSAGE);
     const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => normalizeScenario(copy(scenario))) : [makeScenario()];
     return Object.assign({
       format: FORMAT, schema_version: VERSION,
@@ -87,6 +90,7 @@
   }
 
   function cloneScenario(project, id, name) {
+    if (project.scenarios.length >= MAX_SCENARIOS) throw new Error(SCENARIO_LIMIT_MESSAGE);
     const original = project.scenarios.find(scenario => scenario.id === id);
     if (!original) throw new Error('복제할 시나리오를 찾지 못했습니다.');
     const duplicate = normalizeScenario(copy(original));
@@ -292,6 +296,7 @@
     string(project.product.notes, '비고');
     if (typeof project.is_example !== 'boolean') fileError('예제 표시값이 올바르지 않습니다.');
     if (!Array.isArray(project.scenarios) || !project.scenarios.length) fileError('시나리오가 하나 이상 필요합니다.');
+    if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
     const ids = new Set();
     project.scenarios.forEach((scenario, index) => {
       const path = '시나리오 ' + (index + 1);
@@ -353,5 +358,5 @@
     return result;
   }
 
-  return Object.freeze({ Decimal, FORMAT, VERSION, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
+  return Object.freeze({ Decimal, FORMAT, VERSION, MAX_SCENARIOS, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
 }));

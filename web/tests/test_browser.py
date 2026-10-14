@@ -22,6 +22,10 @@ def scenario(page):
     return next(s for s in data["scenarios"] if s["id"] == data["active_scenario_id"])
 
 
+def select_scenario(page, scenario_id):
+    page.locator(f'#scenario-tabs [data-scenario-id="{scenario_id}"]').click()
+
+
 def discard_if_needed(page):
     dialog = page.locator("dialog.project-dialog")
     if dialog.count():
@@ -78,8 +82,8 @@ def save_file(page, path):
 def test_first_open_fictitious_example_and_three_distinct_pages(page):
     expect(page.locator("#example-banner")).to_be_visible()
     expect(page.locator("#material-body tr")).to_have_count(3)
-    expect(page.locator("#scenario-select option")).to_have_count(2)
-    expect(page.locator('[role="tab"]')).to_have_count(3)
+    expect(page.locator('#scenario-tabs [role="tab"]')).to_have_count(2)
+    expect(page.locator('.page-tabs [role="tab"]')).to_have_count(3)
     expect(page.locator("#tab-results")).to_be_hidden()
     expect(page.locator("#tab-comparison")).to_be_hidden()
     results(page)
@@ -89,7 +93,7 @@ def test_first_open_fictitious_example_and_three_distinct_pages(page):
     expect(page.locator("#tab-comparison")).to_be_hidden()
     comparison(page)
     expect(page.locator("#tab-results")).to_be_hidden()
-    expect(page.locator("#comparison-head th")).to_have_count(3)
+    expect(page.locator("#comparison-head tr").first.locator("th")).to_have_count(3)
     assert "양품" not in page.locator("body").inner_text()
 
 
@@ -124,18 +128,19 @@ def test_tabs_are_named_buttons_and_work_with_keyboard(page):
     expect(page.locator("#product-name")).to_be_focused()
 
 
-def test_pricing_choices_on_left_prices_on_right_and_drug_additions_are_exclusive(page):
+def test_pricing_choices_on_left_prices_on_right_and_drug_additions_are_independent(page):
     setup_base(page)
     choices = page.locator('[data-pricing-flag]')
     expect(choices).to_have_count(6)
     for choice in choices.all():
-        expect(choice).to_have_attribute("type", "radio")
-        expect(choice).to_have_attribute("name", "drug-addition")
+        expect(choice).to_have_attribute("type", "checkbox")
     page.locator('[data-pricing-flag="originator_data"]').check()
     expect(page.locator('[data-pricing-flag="originator_data"]')).to_be_checked()
     page.locator('[data-pricing-flag="domestic_essential"]').check()
-    expect(page.locator('[data-pricing-flag="originator_data"]')).not_to_be_checked()
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(1)
+    expect(page.locator('[data-pricing-flag="originator_data"]')).to_be_checked()
+    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(2)
+    assert scenario(page)["pricing_flags"] == ["originator_data", "domestic_essential"]
+    page.locator('[data-pricing-flag="originator_data"]').uncheck()
     assert scenario(page)["pricing_flags"] == ["domestic_essential"]
     page.locator('[name="company-type"][value="near"]').check()
     page.locator('[name="identical-count-band"][value="ge14"]').check()
@@ -158,7 +163,7 @@ def test_pricing_choices_on_left_prices_on_right_and_drug_additions_are_exclusiv
 def test_root_entry_redirects_into_working_ui(page, site_url):
     page.goto(site_url + "/")
     page.wait_for_url(site_url + "/web/index.html")
-    expect(page.locator("h1")).to_contain_text("의약품 제조원가율")
+    expect(page.locator(".app-header h1")).to_contain_text("의약품 제조원가율")
     expect(page.locator("#api-unit")).to_have_text("40.00")
 
 
@@ -286,7 +291,7 @@ def test_comma_formatting_preserves_precision_through_clone_reload_and_json(page
     page.once("dialog", lambda dialog: dialog.accept("입력 표시 검증"))
     page.locator("#clone-scenario").click()
     expect(page.locator('[data-material-field="price"]')).to_have_value("1,234.5000")
-    page.locator("#scenario-select").select_option(original["id"])
+    select_scenario(page, original["id"])
     expect(page.locator("#batch-size")).to_have_value("100,000")
     expect(page.locator('[data-material-field="price"]')).to_have_value("1,234.5000")
     path = tmp_path / "precision.json"
@@ -392,34 +397,37 @@ def test_cloned_scenario_keeps_original_and_compares_side_by_side(page):
     assert clone["materials"][0]["id"] != original["materials"][0]["id"]
     assert clone["materials"][0]["price"] == "400000"
     comparison(page)
-    expect(page.locator("#comparison-head th")).to_have_count(3)
-    expect(page.locator("#comparison-head th").nth(2)).to_have_text("API 단가 절감안")
+    expect(page.locator("#comparison-head tr").first.locator("th")).to_have_count(3)
+    expect(page.locator("#comparison-head tr").first.locator("th").nth(2)).to_have_text("API 단가 절감안")
     cost_row = page.locator("#comparison-body tr").filter(has=page.get_by_role("rowheader", name="제조원가 (원/T)", exact=True))
     expect(cost_row.locator("td").nth(0)).to_have_text("50.00")
     expect(cost_row.locator("td").nth(1)).to_have_text("47.50")
     page.locator("#tab-button-input").click()
-    page.locator("#scenario-select").select_option(original["id"])
+    select_scenario(page, original["id"])
     expect(page.locator('[data-material-field="price"]')).to_have_value("1,000,000")
     expect(page.locator("#yield-percent")).to_have_value("100")
 
 
-def test_manual_price_and_unverified_automatic_mode_are_distinct(page):
+def test_manual_price_is_fixed_beside_pricing_title_and_loaded_automatic_mode_uses_manual(page, tmp_path):
     setup_base(page)
     add_material(page)
     page.locator("#original-price").fill("600")
     page.locator('[name="company-type"][value="innovative"]').check()
     page.locator('[data-pricing-flag="api_self"]').check()
-    page.locator("#pricing-mode").select_option("official")
-    expect(page.locator("#manual-price")).to_be_disabled()
-    expect(page.locator("#pricing-status")).to_have_text("자동 산정 미확인")
+    expect(page.locator("#pricing-mode")).to_have_count(0)
+    manual_option = page.get_by_role("radio", name="약가 직접 입력", exact=True)
+    expect(manual_option).to_be_checked()
+    expect(page.locator("#manual-price")).to_be_enabled()
+    heading = page.locator("#pricing-heading").bounding_box()
+    mode = manual_option.bounding_box()
+    assert mode["x"] >= heading["x"] + heading["width"]
+    assert abs(mode["y"] - heading["y"]) <= 24
+    payload = save_file(page, tmp_path / "manual.json")
+    payload["scenarios"][0]["pricing_mode"] = "official"
+    open_file(page, {"name": "existing-auto.json", "mimeType": "application/json", "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8")})
+    assert scenario(page)["pricing_mode"] == "manual"
     results(page)
     expect(page.locator("#result-cost")).to_have_text("50.00")
-    expect(page.locator("#result-price")).to_have_text("미확인")
-    expect(page.locator("#result-rate")).to_have_text("계산 불가")
-    page.locator("#tab-button-input").click()
-    page.locator("#pricing-mode").select_option("manual")
-    expect(page.locator("#manual-price")).to_have_value("300")
-    results(page)
     expect(page.locator("#result-price")).to_have_text("300.00")
     expect(page.locator("#pricing-source")).to_have_text("사용자 입력값")
     expect(page.locator("#result-rate")).to_have_text("16.7")
@@ -491,7 +499,7 @@ def test_json_download_open_restores_flags_product_and_scenarios(page, tmp_path)
     flags = ["originator_data", "improved", "biologic", "api_self", "domestic_essential", "own_injectable_pediatric"]
     for flag in flags:
         page.locator(f'[data-pricing-flag="{flag}"]').check()
-    assert scenario(page)["pricing_flags"] == [flags[-1]]
+    assert scenario(page)["pricing_flags"] == flags
     page.once("dialog", lambda dialog: dialog.accept("비교안"))
     page.locator("#clone-scenario").click()
     page.locator("#yield-percent").fill("98")
@@ -502,14 +510,15 @@ def test_json_download_open_restores_flags_product_and_scenarios(page, tmp_path)
     new_project(page)
     open_file(page, path)
     expect(page.locator("#product-name")).to_have_value("검증 제품")
-    expect(page.locator("#scenario-select option")).to_have_count(2)
+    expect(page.locator('#scenario-tabs [role="tab"]')).to_have_count(2)
     expect(page.locator("#yield-percent")).to_have_value("98")
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(1)
-    expect(page.locator(f'[data-pricing-flag="{flags[-1]}"]')).to_be_checked()
+    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(6)
+    for flag in flags:
+        expect(page.locator(f'[data-pricing-flag="{flag}"]')).to_be_checked()
     assert project(page) == expected
 
 
-def test_legacy_multiple_drug_additions_require_explicit_selection_before_save(page, tmp_path):
+def test_legacy_multiple_drug_additions_restore_without_blocking_save(page, tmp_path):
     setup_base(page)
     add_material(page)
     payload = save_file(page, tmp_path / "before.json")
@@ -519,16 +528,12 @@ def test_legacy_multiple_drug_additions_require_explicit_selection_before_save(p
         "mimeType": "application/json",
         "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8"),
     })
-    expect(page.locator("#input-errors")).to_contain_text("약제별 가산이 여러 개 선택")
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(0)
+    expect(page.locator("#input-errors")).to_be_hidden()
+    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(2)
     assert scenario(page)["pricing_flags"] == ["originator_data", "api_self"]
-    downloads = []
-    page.on("download", lambda download: downloads.append(download))
-    page.locator("#save-project").click()
-    expect(page.locator("#toast")).to_be_visible()
-    expect(page.locator("#toast")).to_contain_text("가산")
-    assert not downloads
-    page.locator('[data-pricing-flag="api_self"]').check()
+    saved = save_file(page, tmp_path / "multiple.json")
+    assert saved["scenarios"][0]["pricing_flags"] == ["originator_data", "api_self"]
+    page.locator('[data-pricing-flag="originator_data"]').uncheck()
     expect(page.locator("#input-errors")).to_be_hidden()
     assert scenario(page)["pricing_flags"] == ["api_self"]
     saved = save_file(page, tmp_path / "resolved.json")
@@ -561,7 +566,7 @@ def test_new_project_cancel_and_discard_preserve_user_choice(page):
     page.locator('[data-choice="discard"]').click()
     expect(page.locator("#product-name")).to_have_value("")
     expect(page.locator("#yield-percent")).to_have_value("100")
-    expect(page.locator("#scenario-select option")).to_have_count(1)
+    expect(page.locator('#scenario-tabs [role="tab"]')).to_have_count(1)
     expect(page.locator("#example-banner")).to_be_hidden()
 
 

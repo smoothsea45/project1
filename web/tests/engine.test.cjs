@@ -232,6 +232,83 @@ test('scenario cloning changes IDs and deeply preserves the original', () => {
   assert.equal(project.scenarios.length, 3);
 });
 
+test('four scenarios are allowed and a fifth clone preserves the entire project', () => {
+  assert.equal(E.MAX_SCENARIOS, 4);
+  const project = E.makeProject({ scenarios: [scenario()] });
+  const original = JSON.stringify(project.scenarios[0]);
+  for (let count = 2; count <= E.MAX_SCENARIOS; count += 1) {
+    const cloned = E.cloneScenario(project, project.scenarios[0].id, '비교안 ' + count);
+    cloned.materials[0].price = String(count * 100000);
+    assert.equal(project.scenarios.length, count);
+    assert.equal(project.active_scenario_id, cloned.id);
+    assert.equal(JSON.stringify(project.scenarios[0]), original);
+  }
+  const before = JSON.stringify(project);
+  assert.throws(() => E.cloneScenario(project, project.scenarios[0].id, '추가안'), /한 프로젝트의 시나리오는 최대 4개/);
+  assert.equal(JSON.stringify(project), before);
+  assert.deepEqual(E.parseProject(E.serializeProject(project)), project);
+});
+
+test('rejecting the fifth scenario does not generate any new IDs', () => {
+  let generatedIds = 0;
+  const sandbox = { console, Date, Math, crypto: { randomUUID: () => { generatedIds += 1; return 'generated-' + generatedIds; } } };
+  vm.createContext(sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../vendor/decimal.js'), 'utf8'), sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../engine.js'), 'utf8'), sandbox);
+  const project = E.makeProject({ scenarios: Array.from({ length: 4 }, (_, index) => scenario({ name: '안 ' + index })) });
+  const before = JSON.stringify(project);
+  assert.throws(() => sandbox.PharmaCost.cloneScenario(project, project.active_scenario_id), /최대 4개/);
+  assert.equal(generatedIds, 0);
+  assert.equal(JSON.stringify(project), before);
+});
+
+test('project construction rejects more than four scenarios without changing supplied data', () => {
+  const scenarios = Array.from({ length: 5 }, (_, index) => scenario({ name: '안 ' + index }));
+  delete scenarios[0].packaging_form;
+  const supplied = { scenarios, active_scenario_id: scenarios[4].id };
+  const before = JSON.stringify(supplied);
+  assert.throws(() => E.makeProject(supplied), /최대 4개.*원본 데이터는 변경하지 않았습니다/);
+  assert.equal(JSON.stringify(supplied), before);
+  assert.equal(E.makeProject({ scenarios: scenarios.slice(0, 4) }).scenarios.length, 4);
+});
+
+test('validation, load and save reject oversized legacy projects without truncating or normalizing them', () => {
+  const project = E.makeProject({ scenarios: Array.from({ length: 4 }, (_, index) => scenario({ name: '안 ' + index })) });
+  project.scenarios.push(scenario({ name: '기존 다섯 번째 안' }));
+  project.active_scenario_id = project.scenarios[4].id;
+  delete project.scenarios[0].packaging_form;
+  const before = JSON.stringify(project);
+  for (const operation of [() => E.validateProject(project), () => E.serializeProject(project), () => E.parseProject(before)]) {
+    assert.throws(operation, /프로젝트 파일 오류: 한 프로젝트의 시나리오는 최대 4개.*원본 데이터는 변경하지 않았습니다/);
+    assert.equal(JSON.stringify(project), before);
+    assert.equal(project.scenarios.length, 5);
+  }
+});
+
+test('four independent scenarios and multiple medication checkboxes survive JSON roundtrip', () => {
+  const project = E.makeProject({ scenarios: [scenario({ pricing_flags: ['originator_data', 'improved', 'biologic', 'api_self', 'domestic_essential', 'own_injectable_pediatric'] })] });
+  for (let count = 2; count <= E.MAX_SCENARIOS; count += 1) {
+    const cloned = E.cloneScenario(project, project.scenarios[0].id, '복수 가산안 ' + count);
+    cloned.pricing_flags = count % 2 ? ['improved', 'api_self'] : ['biologic', 'domestic_essential'];
+    cloned.packaging_form = '포장 ' + count;
+  }
+  const loaded = E.parseProject(E.serializeProject(project));
+  assert.deepEqual(loaded, project);
+  assert.equal(loaded.scenarios.length, 4);
+  assert.equal(loaded.scenarios[0].pricing_flags.length, 6);
+  loaded.scenarios[1].pricing_flags.push('api_self');
+  assert.deepEqual(project.scenarios[1].pricing_flags, ['biologic', 'domestic_essential']);
+  equal(E.calculate(loaded.scenarios[0]).total_cost, '20');
+});
+
+test('multiple pricing flags still reject duplicated or unsupported choices', () => {
+  const project = E.makeProject({ scenarios: [scenario({ pricing_flags: ['improved', 'api_self'] })] });
+  project.scenarios[0].pricing_flags.push('improved');
+  assert.throws(() => E.serializeProject(project), /가산 조건이 중복/);
+  project.scenarios[0].pricing_flags = ['improved', 'not_a_supported_flag'];
+  assert.throws(() => E.parseProject(JSON.stringify(project)), /가산 조건의 선택값을 지원하지 않습니다/);
+});
+
 test('JSON save/load preserves all pricing conditions and independent scenarios', () => {
   const project = E.createExampleProject();
   E.cloneScenario(project, project.active_scenario_id, '수율 시나리오').yield_percent = '98.25';

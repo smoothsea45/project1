@@ -16,14 +16,14 @@ from web.tests.test_browser import (
     save_file,
     scenario,
     setup_base,
+    select_scenario,
 )
 
 
 COMPARISON_FIELDS = [
     "name", "batch_size", "yield_percent", "packaging_form", "api_supplier",
-    "api_price", "price", "total_cost", "cost_rate", "composition", "api_batch",
-    "api_unit", "excipient_batch", "excipient_unit", "packaging_batch",
-    "packaging_unit", "labor_batch", "labor_unit",
+    "api_price", "price", "total_cost", "cost_rate", "composition", "api_cost",
+    "excipient_cost", "packaging_cost", "labor_cost",
 ]
 
 
@@ -33,6 +33,12 @@ def comparison_row(page, field):
 
 def comparison_chart(page, scenario_id):
     return page.locator(f'.comparison-composition[data-scenario-id="{scenario_id}"]')
+
+
+def cost_cell(page, field, scenario_id, basis):
+    return comparison_row(page, field).locator(
+        f'td[data-scenario-id="{scenario_id}"][data-cost-basis="{basis}"]'
+    )
 
 
 def test_money_and_percent_precision_are_display_only(page):
@@ -99,7 +105,7 @@ def test_packaging_form_is_independent_scenario_input_and_persists(page, tmp_pat
     open_file(page, saved)
     expect(page.locator("#packaging-form")).to_have_value("100T / 병")
     assert project(page) == expected
-    page.locator("#scenario-select").select_option(original["id"])
+    select_scenario(page, original["id"])
     expect(page.locator("#packaging-form")).to_have_value("30T / PTP (10T × 3)")
 
 
@@ -151,6 +157,7 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
     page.locator('[data-material-field="supplier"]').fill("대체 제조원")
     page.locator("#yield-percent").fill("80")
     page.locator("#packaging-form").fill("100T / 병")
+    clone_id = scenario(page)["id"]
     comparison(page)
     assert page.locator("#comparison-body tr").evaluate_all(
         "rows => rows.map(row => row.dataset.comparisonField)"
@@ -163,12 +170,16 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
     expect(comparison_row(page, "price").locator("td").nth(1)).to_have_text("300.00")
     for field, expected in [
         ("total_cost", "47.50"), ("cost_rate", "15.8%"),
-        ("api_batch", "800,000.00"), ("api_unit", "10.00"),
-        ("excipient_batch", "0.00"), ("excipient_unit", "0.00"),
-        ("packaging_batch", "1,000,000.00"), ("packaging_unit", "12.50"),
-        ("labor_batch", "2,000,000.00"), ("labor_unit", "25.00"),
     ]:
         expect(comparison_row(page, field).locator("td").nth(1)).to_have_text(expected)
+    for field, batch, unit in [
+        ("api_cost", "800,000.00", "10.00"),
+        ("excipient_cost", "0.00", "0.00"),
+        ("packaging_cost", "1,000,000.00", "12.50"),
+        ("labor_cost", "2,000,000.00", "25.00"),
+    ]:
+        expect(cost_cell(page, field, clone_id, "batch")).to_have_text(batch)
+        expect(cost_cell(page, field, clone_id, "unit")).to_have_text(unit)
     expect(page.locator(".comparison-composition")).to_have_count(2)
     for item in project(page)["scenarios"]:
         graph = comparison_chart(page, item["id"])
@@ -225,7 +236,7 @@ def test_combination_api_suppliers_and_price_units_remain_readable_in_comparison
     expect(suppliers).to_contain_text("제조원 B · 수입")
     expect(prices).to_contain_text("1,000,000.00 원/kg")
     expect(prices).to_contain_text("1.23 달러/g")
-    expect(comparison_row(page, "api_unit").locator("td")).to_have_text("37.28")
+    expect(cost_cell(page, "api_cost", scenario(page)["id"], "unit")).to_have_text("37.28")
     expect(comparison_row(page, "total_cost").locator("td")).to_have_text("67.28")
     for cell in [suppliers, prices]:
         entries = cell.locator(".comparison-api-list > div")
@@ -313,7 +324,7 @@ def test_pricing_choice_rows_align_within_each_group(page):
         assert max(box["x"] for box in boxes) - min(box["x"] for box in boxes) <= 1
         assert max(box["width"] for box in boxes) - min(box["width"] for box in boxes) <= 1
         assert max(box["height"] for box in boxes) - min(box["height"] for box in boxes) <= 1
-        radio_boxes = [choice.locator('input[type="radio"]').bounding_box() for choice in choices.all()]
+        radio_boxes = [choice.locator('input').bounding_box() for choice in choices.all()]
         assert max(box["x"] for box in radio_boxes) - min(box["x"] for box in radio_boxes) <= 1
         for choice in choices.all():
             assert choice.evaluate("node => node.scrollWidth <= node.clientWidth + 1")

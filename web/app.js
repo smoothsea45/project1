@@ -18,8 +18,20 @@
   let loadNotice = '';
   try {
     const draft = localStorage.getItem(STORAGE_KEY);
-    if (draft) { project = E.parseProject(draft); loadNotice = '이 브라우저에 저장된 초안을 복원했습니다.'; }
-  } catch (error) { storageAvailable = false; loadNotice = '브라우저 초안을 읽지 못했습니다. JSON 파일로 저장해 주세요.'; }
+    if (draft) {
+      project = useManualPricing(E.parseProject(draft));
+      loadNotice = '이 브라우저에 저장된 초안을 복원했습니다. 약가는 직접 입력값을 사용합니다.';
+    }
+  } catch (error) {
+    storageAvailable = false;
+    loadNotice = '기존 브라우저 초안을 그대로 보관했습니다. 복원할 수 없습니다: ' + error.message;
+  }
+
+  function useManualPricing(value) {
+    // The current screen supports direct pricing only; preserve all entered amounts.
+    value.scenarios.forEach(s => { s.pricing_mode = 'manual'; });
+    return value;
+  }
 
   function active() { return project.scenarios.find(s => s.id === project.active_scenario_id); }
   function element(tag, text, className) {
@@ -145,20 +157,31 @@
       else if (input.inputMode === 'decimal') setNumericDisplay(input, value);
       else input.value = value === null || value === undefined ? '' : value;
     });
-    const flag = s.pricing_flags.length === 1 ? s.pricing_flags[0] : null;
-    document.querySelectorAll('[data-pricing-flag]').forEach(input => { input.checked = input.dataset.pricingFlag === flag; });
-    $('manual-price').disabled = s.pricing_mode !== 'manual';
+    document.querySelectorAll('[data-pricing-flag]').forEach(input => { input.checked = s.pricing_flags.includes(input.dataset.pricingFlag); });
   }
-  function renderScenarioSelect() {
-    $('scenario-select').replaceChildren();
+  function renderScenarioTabs() {
+    $('scenario-tabs').replaceChildren();
     for (const s of project.scenarios) {
-      const option = element('option', s.name);
-      option.value = s.id;
-      option.selected = s.id === project.active_scenario_id;
-      $('scenario-select').append(option);
+      const selected = s.id === project.active_scenario_id;
+      const button = element('button', s.name, 'scenario-tab' + (selected ? ' active' : ''));
+      button.type = 'button'; button.dataset.scenarioId = s.id;
+      button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(selected));
+      button.tabIndex = selected ? 0 : -1;
+      button.title = s.name;
+      button.addEventListener('click', () => activateScenario(s.id));
+      $('scenario-tabs').append(button);
     }
     $('delete-scenario').disabled = project.scenarios.length < 2;
+    $('clone-scenario').disabled = project.scenarios.length >= E.MAX_SCENARIOS;
+    $('clone-scenario').title = project.scenarios.length >= E.MAX_SCENARIOS ? '한 프로젝트에는 최대 ' + E.MAX_SCENARIOS + '개 시나리오를 만들 수 있습니다.' : '현재 입력값을 새 시나리오로 복제합니다.';
     $('scenario-count').textContent = project.scenarios.length + '개 시나리오';
+  }
+  function activateScenario(id) {
+    if (id === project.active_scenario_id || !project.scenarios.some(s => s.id === id)) return;
+    project.active_scenario_id = id;
+    selectedRows = new Set();
+    populateFields(); renderScenarioTabs(); renderMaterials(); changed();
+    [...$('scenario-tabs').children].find(button => button.dataset.scenarioId === id).focus();
   }
   function tableInput(row, field, label, numeric = false) {
     const input = element('input');
@@ -219,7 +242,7 @@
   }
   function renderAll() {
     selectedRows = new Set();
-    populateFields(); renderScenarioSelect(); renderMaterials(); recalculate(); updateStatus();
+    populateFields(); renderScenarioTabs(); renderMaterials(); recalculate(); updateStatus();
     $('example-banner').hidden = !project.is_example;
   }
   function markValidation(result) {
@@ -255,7 +278,6 @@
   }
   function recalculate() {
     const result = E.calculate(active());
-    if (active().pricing_flags.length > 1) result.issues.push({path: 'pricing_flags', message: '기존 프로젝트에 약제별 가산이 여러 개 선택되어 있습니다. 6개 항목 중 하나를 다시 선택해 주세요.', severity: 'warning'});
     currentResult = result;
     const rows = new Map(result.rows.map(row => [row.id, row]));
     for (const tr of $('material-body').children) {
@@ -269,17 +291,16 @@
     for (const [id, field] of Object.entries({'api-batch': 'api_batch', 'excipient-batch': 'excipient_batch', 'api-unit': 'api_unit', 'excipient-unit': 'excipient_unit', 'packaging-unit': 'packaging_unit', 'labor-unit': 'labor_unit'})) $(id).textContent = format(result[field]);
     markValidation(result);
     $('result-cost').textContent = format(result.total_cost);
-    $('result-price').textContent = format(result.pricing.amount, 2, active().pricing_mode === 'official' ? '미확인' : '미입력');
+    $('result-price').textContent = format(result.pricing.amount, 2, '미입력');
     $('result-rate').textContent = percentage(result.cost_rate, '계산 불가', false);
     $('batch-total-note').textContent = '배치 전체 비용 ' + format(result.batch_total) + ' 원';
     renderPricing(result.pricing); renderComposition(result); renderComparison();
   }
   function renderPricing(pricing) {
-    const manual = active().pricing_mode === 'manual';
-    $('pricing-status').textContent = manual ? '사용자 입력값' : '자동 산정 미확인';
-    $('pricing-status').className = 'status-pill ' + (manual ? 'success' : 'warning');
+    $('pricing-status').textContent = '사용자 입력값';
+    $('pricing-status').className = 'status-pill success';
     $('pricing-source').textContent = pricing.source;
-    $('pricing-input-note').textContent = manual ? '가산 조건은 기록만 합니다. 원가율에는 우리 제품 예상 약가를 사용합니다.' : '공식 규정·산정률이 확인되지 않아 자동 약가와 해당 원가율을 계산하지 않습니다.';
+    $('pricing-input-note').textContent = '가산 조건은 기록만 합니다. 원가율에는 직접 입력한 우리 제품 예상 약가를 사용합니다.';
   }
   function renderComposition(result, root = document.querySelector('.composition-card')) {
     const parts = {
@@ -396,11 +417,20 @@
   function renderComparison() {
     $('comparison-head').replaceChildren(); $('comparison-body').replaceChildren();
     $('comparison-body').closest('table').style.width = (166 + project.scenarios.length * 340) + 'px';
-    const header = element('tr'); header.append(element('th', '비교 항목', 'row-label'));
+    const header = element('tr');
+    const itemHeader = element('th', '비교 항목', 'row-label');
+    itemHeader.rowSpan = 2; itemHeader.scope = 'col'; header.append(itemHeader);
+    const unitHeader = element('tr', undefined, 'comparison-unit-header');
     for (const s of project.scenarios) {
-      const th = element('th', s.name, s.id === project.active_scenario_id ? 'current' : ''); th.scope = 'col'; header.append(th);
+      const th = element('th', s.name, s.id === project.active_scenario_id ? 'current' : '');
+      th.scope = 'colgroup'; th.colSpan = 2; th.dataset.scenarioId = s.id; header.append(th);
+      for (const [basis, label] of [['batch', '배치당 (원)'], ['unit', '1T당 (원/T)']]) {
+        const unit = element('th', label, s.id === project.active_scenario_id ? 'current' : '');
+        unit.scope = 'col'; unit.dataset.scenarioId = s.id; unit.dataset.costBasis = basis;
+        unitHeader.append(unit);
+      }
     }
-    $('comparison-head').append(header);
+    $('comparison-head').append(header, unitHeader);
     const results = project.scenarios.map(s => E.calculate(s));
     const apiDetails = (s, value) => {
       const list = element('div', undefined, 'comparison-api-list');
@@ -430,14 +460,10 @@
         renderComposition(r, chart);
         return chart;
       }],
-      ['api_batch', '배치당 API 비용 (원)', (s, r) => format(r.api_batch)],
-      ['api_unit', '1T당 API 비용 (원/T)', (s, r) => format(r.api_unit)],
-      ['excipient_batch', '배치당 부형제 비용 (원)', (s, r) => format(r.excipient_batch)],
-      ['excipient_unit', '1T당 부형제 비용 (원/T)', (s, r) => format(r.excipient_unit)],
-      ['packaging_batch', '배치 포자재비 (원)', s => format(s.batch_packaging)],
-      ['packaging_unit', '1T당 포자재비 (원/T)', (s, r) => format(r.packaging_unit)],
-      ['labor_batch', '배치 공수비 (원)', s => format(s.batch_labor)],
-      ['labor_unit', '1T당 공수비 (원/T)', (s, r) => format(r.labor_unit)]
+      ['api_cost', 'API 비용', (s, r) => [r.api_batch, r.api_unit]],
+      ['excipient_cost', '부형제 비용', (s, r) => [r.excipient_batch, r.excipient_unit]],
+      ['packaging_cost', '포자재비', (s, r) => [s.batch_packaging, r.packaging_unit]],
+      ['labor_cost', '공수비', (s, r) => [s.batch_labor, r.labor_unit]]
     ];
     for (const [field, label, value] of rows) {
       const tr = element('tr'); tr.dataset.comparisonField = field;
@@ -446,7 +472,17 @@
       const th = element('th', label, 'row-label'); th.scope = 'row'; tr.append(th);
       project.scenarios.forEach((s, index) => {
         const content = value(s, results[index]);
+        if (Array.isArray(content)) {
+          content.forEach((amount, costIndex) => {
+            const td = element('td', format(amount), 'comparison-cost-cell numeric' + (s.id === project.active_scenario_id ? ' current' : ''));
+            td.dataset.scenarioId = s.id; td.dataset.costBasis = costIndex === 0 ? 'batch' : 'unit';
+            td.title = (costIndex === 0 ? '배치당: ' : '1T당: ') + format(amount) + (costIndex === 0 ? ' 원' : ' 원/T');
+            tr.append(td);
+          });
+          return;
+        }
         const td = element('td', undefined, s.id === project.active_scenario_id ? 'current' : '');
+        td.colSpan = 2; td.dataset.scenarioId = s.id;
         if (typeof content === 'string') { td.textContent = content; td.title = content; }
         else { td.append(content); td.classList.add(field === 'composition' ? 'comparison-chart-cell' : 'text-value'); }
         tr.append(td);
@@ -461,9 +497,16 @@
     for (const panel of ['input', 'results', 'comparison']) $('tab-' + panel).hidden = name !== panel;
     document.querySelectorAll('[data-tab]').forEach(button => { button.tabIndex = button.dataset.tab === name ? 0 : -1; });
   }
+  function prepareComparisonPrint() {
+    renderComparison();
+    $('print-product-name').textContent = project.product.product_name || '의약품 제조원가율 시뮬레이션';
+    $('print-product-notes').textContent = project.product.notes;
+    $('print-product-notes').hidden = !project.product.notes;
+    $('print-date').textContent = new Date().toLocaleDateString('ko-KR');
+    document.body.classList.add('printing-comparison');
+  }
   function saveFile() {
     try {
-      if (project.scenarios.some(s => s.pricing_flags.length > 1)) throw new Error('약제별 가산이 여러 개 선택된 시나리오에서 6개 항목 중 하나를 다시 선택하세요.');
       const data = E.serializeProject(project);
       const blob = new Blob([data], {type: 'application/json;charset=utf-8'});
       const url = URL.createObjectURL(blob); const a = element('a');
@@ -501,24 +544,24 @@
     input.addEventListener(event, () => {
       if (input.type === 'radio' && !input.checked) return;
       active()[input.dataset.field] = input.value;
-      if (input.dataset.field === 'pricing_mode') $('manual-price').disabled = input.value !== 'manual';
       changed();
     });
   });
   document.querySelectorAll('[data-pricing-flag]').forEach(input => input.addEventListener('change', () => {
-    if (!input.checked) return;
-    active().pricing_flags = [input.dataset.pricingFlag]; changed();
+    active().pricing_flags = [...document.querySelectorAll('[data-pricing-flag]:checked')].map(node => node.dataset.pricingFlag);
+    changed();
   }));
-  $('scenario-select').addEventListener('change', () => { project.active_scenario_id = $('scenario-select').value; selectedRows = new Set(); populateFields(); renderMaterials(); changed(); });
   $('clone-scenario').addEventListener('click', () => {
+    if (project.scenarios.length >= E.MAX_SCENARIOS) { showToast('한 프로젝트에는 최대 ' + E.MAX_SCENARIOS + '개 시나리오를 만들 수 있습니다.'); return; }
     const name = prompt('복제할 시나리오 이름을 입력하세요.', active().name + ' 복사');
     if (name === null) return; if (!name.trim()) { showToast('시나리오 이름을 입력하세요.'); return; }
-    const cloned = E.cloneScenario(project, active().id, name.trim()); project.active_scenario_id = cloned.id; renderAll(); changed();
+    try { E.cloneScenario(project, active().id, name.trim()); renderAll(); changed(); }
+    catch (error) { showToast(error.message); }
   });
   $('rename-scenario').addEventListener('click', () => {
     const name = prompt('시나리오 이름을 입력하세요.', active().name);
     if (name === null) return; if (!name.trim()) { showToast('시나리오 이름을 입력하세요.'); return; }
-    active().name = name.trim(); renderScenarioSelect(); changed();
+    active().name = name.trim(); renderScenarioTabs(); changed();
   });
   $('delete-scenario').addEventListener('click', () => {
     if (project.scenarios.length < 2) return;
@@ -532,6 +575,14 @@
   $('select-all-materials').addEventListener('change', () => { selectedRows = new Set($('select-all-materials').checked ? active().materials.map(m => m.id) : []); renderMaterials(); });
   $('delete-materials').addEventListener('click', () => { active().materials = active().materials.filter(m => !selectedRows.has(m.id)); selectedRows.clear(); renderMaterials(); changed(); });
   $('save-project').addEventListener('click', saveFile);
+  $('print-comparison').addEventListener('click', () => {
+    selectTab('comparison');
+    prepareComparisonPrint();
+    try { window.print(); }
+    catch (error) { document.body.classList.remove('printing-comparison'); showToast('출력 창을 열 수 없습니다: ' + error.message); }
+  });
+  window.addEventListener('beforeprint', prepareComparisonPrint);
+  window.addEventListener('afterprint', () => document.body.classList.remove('printing-comparison'));
   $('new-project').addEventListener('click', async () => { if (!(await confirmDiscard())) return; project = E.makeProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
   $('load-example').addEventListener('click', async () => { if (!(await confirmDiscard())) return; project = E.createExampleProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
   $('open-project').addEventListener('click', () => $('open-file').click());
@@ -539,7 +590,7 @@
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
     try {
       if (file.size > 16 * 1024 * 1024) throw new Error('프로젝트 파일은 16MB 이하여야 합니다.');
-      const loaded = E.parseProject(await file.text());
+      const loaded = useManualPricing(E.parseProject(await file.text()));
       if (!(await confirmDiscard())) return;
       project = loaded; dirty = false; renderAll(); persistDraft(); updateStatus(); showToast('프로젝트를 열었습니다: ' + file.name);
     } catch (error) { showToast('파일을 열 수 없습니다: ' + error.message); }
@@ -568,6 +619,14 @@
     if (replacement) replacement.focus();
   });
   document.addEventListener('keydown', event => {
+    if (event.target.matches('#scenario-tabs [role="tab"]') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const buttons = [...$('scenario-tabs').children];
+      const current = buttons.indexOf(event.target);
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+      activateScenario(buttons[index].dataset.scenarioId);
+      [...$('scenario-tabs').children][index].focus();
+    }
     if (event.target.matches('[data-tab]') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
       const buttons = [...document.querySelectorAll('[data-tab]')];

@@ -1,6 +1,7 @@
 """Cost-chart regression checks using the real offline app and calculation data."""
 
 import re
+import json
 
 import pytest
 from playwright.sync_api import expect
@@ -10,6 +11,8 @@ from web.tests.test_browser import (
     results,
     scenario,
     setup_base,
+    open_file,
+    select_scenario,
 )
 
 
@@ -149,7 +152,7 @@ def test_clone_switch_restores_chart_for_original_without_mutating_original(page
     expect(page.locator("#donut-total")).to_contain_text("60")
     assert stack_share(page, "api") == pytest.approx(20 / 60 * 100)
     input_tab(page)
-    page.locator("#scenario-select").select_option(original["id"])
+    select_scenario(page, original["id"])
     results(page)
     expect(page.locator("#donut-total")).to_contain_text("80")
     assert stack_share(page, "api") == pytest.approx(50)
@@ -168,11 +171,14 @@ def test_unusable_insurance_price_has_neutral_donut_and_valid_cost_stack(page, p
     assert_finite_chart(page)
 
 
-def test_unverified_automatic_pricing_does_not_draw_fabricated_insurance_proportions(page):
-    page.locator("#pricing-mode").select_option("official")
+def test_loaded_automatic_mode_draws_only_real_manual_price_after_mode_normalization(page):
+    payload = project(page)
+    payload["scenarios"][0]["pricing_mode"] = "official"
+    open_file(page, {"name": "existing-auto.json", "mimeType": "application/json", "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8")})
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("계산 불가")
-    expect(page.locator("#composition-donut [data-item]")).to_have_count(0)
+    assert scenario(page)["pricing_mode"] == "manual"
+    expect(page.locator("#donut-rate")).to_have_text("26.7%")
+    assert donut_share(page, "api") == pytest.approx(40 / 300 * 100)
     assert stack_share(page, "api") == pytest.approx(50)
     expect(page.locator("#donut-note")).not_to_be_empty()
     assert_finite_chart(page)
