@@ -1,2 +1,2 @@
-# 실행 시 필요한 유일한 외부 라이브러리입니다.
+# Runtime dependency; keep this file ASCII-compatible for Windows pip.
 PySide6==6.8.3

@@ -21,7 +21,7 @@ if errorlevel 1 goto setup_failed
 ".venv\Scripts\python.exe" -c "import PySide6; import sys; sys.exit(0 if PySide6.__version__ == '6.8.3' else 1)" >nul 2>&1
 if not errorlevel 1 goto run_app
 echo First-time setup: an Internet connection is required.
-".venv\Scripts\python.exe" -m pip install -r requirements.txt
+".venv\Scripts\python.exe" -X utf8 -m pip install -r requirements.txt
 if errorlevel 1 goto setup_failed
 
 :run_app
