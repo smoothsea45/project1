@@ -1,0 +1,23 @@
+# 개발 환경 및 Python 생성 파일
+.venv/
+.venv-build/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.pip-cache/
+.coverage
+htmlcov/
+
+# 배포 산출물
+build/
+dist/
+
+# IDE 및 운영체제
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# 사용자의 프로젝트 데이터는 저장소에 포함하지 않습니다.
+*.pharmacost.json

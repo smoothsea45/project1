@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pharma-cost-simulator"
+version = "0.1.0"
+description = "오프라인 의약품 제조원가율 시뮬레이터"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PySide6==6.8.3"]
+
+[project.optional-dependencies]
+dev = ["pytest==8.3.5", "PyInstaller==6.12.0"]
+
+[project.gui-scripts]
+pharma-cost = "pharma_cost.ui.main_window:main"
+
+[tool.setuptools.packages.find]
+include = ["pharma_cost*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q"
