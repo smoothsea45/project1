@@ -42,6 +42,68 @@
     return parts[0] + (parts[1] ? '.' + parts[1] : '');
   }
   function rate(value) { return value === null ? '계산 불가' : format(value, 2) + '%'; }
+  // Keep every decimal digit the user entered. Separators are only presentation.
+  function numericEntry(raw) {
+    const text = String(raw === null || raw === undefined ? '' : raw).trim();
+    if (!text) return {value: '', display: ''};
+    try { if (E.parseNumber(text) === null) return {value: text, display: text}; }
+    catch (error) { return {value: text, display: text}; }
+    const value = text.replace(/,/g, '');
+    const match = /^([+]?)(\d*)(\.\d*)?$/.exec(value);
+    if (!match) return {value, display: value};
+    return {value, display: match[1] + match[2].replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (match[3] || '')};
+  }
+  function setNumericDisplay(input, value) {
+    input.value = numericEntry(value).display;
+    input.dataset.numericDisplay = input.value;
+  }
+  function inputPosition(text, digitCount) {
+    if (digitCount <= 0) return 0;
+    let count = 0;
+    for (let i = 0; i < text.length; i++) {
+      if (text[i] !== ',') count++;
+      if (count === digitCount) return i + 1;
+    }
+    return text.length;
+  }
+  function bindNumericInput(input, callback) {
+    function commit(event) {
+      const raw = input.value;
+      const start = input.selectionStart === null ? raw.length : input.selectionStart;
+      const end = input.selectionEnd === null ? start : input.selectionEnd;
+      const direction = input.selectionDirection || 'none';
+      const previous = input.dataset.numericDisplay || '';
+      let candidate = raw;
+      const inputType = event && typeof event.inputType === 'string' ? event.inputType : '';
+      const interactive = inputType.startsWith('delete') || (inputType === 'insertText' && typeof event.data === 'string' && !event.data.includes(','));
+      if (interactive && previous.includes(',') && raw.includes(',')) {
+        try {
+          if (E.parseNumber(previous) !== null) candidate = raw.replace(/,/g, '');
+        } catch (error) { /* Malformed imported/pasted values must remain visible. */ }
+      }
+      const entry = numericEntry(candidate);
+      input.value = entry.display;
+      const before = raw.slice(0, start).replace(/,/g, '').length;
+      const after = raw.slice(0, end).replace(/,/g, '').length;
+      if (entry.display !== raw) input.setSelectionRange(inputPosition(entry.display, before), inputPosition(entry.display, after), direction);
+      input.dataset.numericDisplay = entry.display;
+      callback(entry.value);
+    }
+    input.addEventListener('input', commit);
+    input.addEventListener('beforeinput', event => {
+      const caret = input.selectionStart;
+      if (caret === null || caret !== input.selectionEnd) return;
+      let start = caret;
+      let end = caret;
+      if (event.inputType === 'deleteContentBackward' && input.value[caret - 1] === ',') start = Math.max(0, caret - 2);
+      else if (event.inputType === 'deleteContentForward' && input.value[caret] === ',') end = Math.min(input.value.length, caret + 2);
+      else return;
+      event.preventDefault();
+      input.value = input.value.slice(0, start) + input.value.slice(end);
+      input.setSelectionRange(start, start);
+      commit({inputType: event.inputType, data: null});
+    });
+  }
   function showToast(message) {
     clearTimeout(toastTimer);
     $('toast').textContent = message;
@@ -78,9 +140,11 @@
     document.querySelectorAll('[data-field]').forEach(input => {
       const value = s[input.dataset.field];
       if (input.type === 'radio') input.checked = value === input.value;
+      else if (input.inputMode === 'decimal') setNumericDisplay(input, value);
       else input.value = value === null || value === undefined ? '' : value;
     });
-    document.querySelectorAll('[data-pricing-flag]').forEach(input => { input.checked = s.pricing_flags.includes(input.dataset.pricingFlag); });
+    const flag = s.pricing_flags.length === 1 ? s.pricing_flags[0] : null;
+    document.querySelectorAll('[data-pricing-flag]').forEach(input => { input.checked = input.dataset.pricingFlag === flag; });
     $('manual-price').disabled = s.pricing_mode !== 'manual';
   }
   function renderScenarioSelect() {
@@ -100,8 +164,11 @@
     input.value = row[field] === null ? '' : row[field];
     input.dataset.materialField = field;
     input.setAttribute('aria-label', label);
-    if (numeric) input.inputMode = 'decimal';
-    input.addEventListener('input', () => { row[field] = input.value; changed(); });
+    if (numeric) {
+      input.inputMode = 'decimal';
+      setNumericDisplay(input, row[field]);
+      bindNumericInput(input, value => { row[field] = value; changed(); });
+    } else input.addEventListener('input', () => { row[field] = input.value; changed(); });
     return input;
   }
   function tableSelect(row, field, names, label) {
@@ -186,6 +253,7 @@
   }
   function recalculate() {
     const result = E.calculate(active());
+    if (active().pricing_flags.length > 1) result.issues.push({path: 'pricing_flags', message: '기존 프로젝트에 약제별 가산이 여러 개 선택되어 있습니다. 6개 항목 중 하나를 다시 선택해 주세요.', severity: 'warning'});
     currentResult = result;
     const rows = new Map(result.rows.map(row => [row.id, row]));
     for (const tr of $('material-body').children) {
@@ -201,15 +269,8 @@
     $('result-cost').textContent = format(result.total_cost);
     $('result-price').textContent = format(result.pricing.amount, 4, active().pricing_mode === 'official' ? '미확인' : '미입력');
     $('result-rate').textContent = format(result.cost_rate, 2, '계산 불가');
-    $('result-gap').textContent = result.target_gap === null ? '계산 불가' : (result.target_gap.gt(0) ? '+' : '') + format(result.target_gap, 2);
-    $('result-savings').textContent = format(result.required_saving, 4, '계산 불가');
     $('batch-total-note').textContent = '배치 전체 비용 ' + format(result.batch_total) + ' 원';
-    $('target-rate-note').textContent = '목표 ' + format(active().target_rate, 2, '미입력') + '% · 현재 원가율 − 목표';
-    $('allowed-cost-note').textContent = '허용 제조원가 ' + format(result.allowed_cost, 4, '계산 불가') + ' 원/T';
     $('result-post-rate').textContent = active().post_price === null || active().post_price === '' ? '미입력 (선택 항목)' : rate(result.post_rate);
-    const status = result.target_gap === null ? '판정 불가' : result.target_gap.lte(0) ? '목표 달성' : '목표 초과';
-    $('result-target-status').textContent = status;
-    $('result-target-status').className = 'target-status ' + (status === '목표 달성' ? 'achieved' : status === '목표 초과' ? 'exceeded' : '');
     renderPricing(result.pricing); renderComposition(result); renderComparison();
   }
   function renderPricing(pricing) {
@@ -257,8 +318,8 @@
       ['배치사이즈 (T)', s => format(s.batch_size, 0, '미입력')],
       ['수율 (%)', s => format(s.yield_percent, 2, '미입력')],
       ['환율 (원/USD)', s => format(s.exchange_rate, 2, '미입력')],
-      ['원료·처방 (mg/T)', s => s.materials.map(m => (m.name || '원료') + ' ' + (m.amount || '미입력')).join(' / ') || '원료 없음'],
-      ['API 제조원·단가', s => s.materials.filter(m => m.kind === 'api').map(m => (m.supplier || '공급처 미입력') + ' / ' + (m.price || '미입력') + ' ' + unitNames[m.price_unit]).join(' / ') || 'API 없음'],
+      ['원료·처방 (mg/T)', s => s.materials.map(m => (m.name || '원료') + ' ' + format(m.amount, 4, '미입력')).join(' / ') || '원료 없음'],
+      ['API 제조원·단가', s => s.materials.filter(m => m.kind === 'api').map(m => (m.supplier || '공급처 미입력') + ' / ' + format(m.price, 4, '미입력') + ' ' + unitNames[m.price_unit]).join(' / ') || 'API 없음'],
       ['오리지널 약가 (원/T)', s => format(s.original_price, 4, '미입력')],
       ['기업 구분', s => companyNames[s.company_type]],
       ['가산 조건', s => s.pricing_flags.map(flag => flagNames[flag]).join(' / ') || '미선택'],
@@ -275,9 +336,7 @@
       ['우리 제품 약가 (원/T)', (s, r) => format(r.pricing.amount, 4, '계산 불가')],
       ['약가 출처', (s, r) => r.pricing.source],
       ['제조원가율 (%)', (s, r) => rate(r.cost_rate)],
-      ['목표 원가율 (%)', s => format(s.target_rate, 2, '미입력')],
-      ['허용 제조원가 (원/T)', (s, r) => format(r.allowed_cost, 4, '계산 불가')],
-      ['필요 절감액 (원/T)', (s, r) => format(r.required_saving, 4, '계산 불가')]
+      ['가산 종료 후 원가율 (%)', (s, r) => rate(r.post_rate)]
     ];
     for (const [label, value] of rows) {
       const tr = element('tr'); const th = element('th', label, 'row-label'); th.scope = 'row'; tr.append(th);
@@ -289,10 +348,12 @@
     document.querySelectorAll('[data-tab]').forEach(button => {
       const selected = button.dataset.tab === name; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected));
     });
-    $('tab-input').hidden = name !== 'input'; $('tab-results').hidden = name !== 'results';
+    for (const panel of ['input', 'results', 'comparison']) $('tab-' + panel).hidden = name !== panel;
+    document.querySelectorAll('[data-tab]').forEach(button => { button.tabIndex = button.dataset.tab === name ? 0 : -1; });
   }
   function saveFile() {
     try {
+      if (project.scenarios.some(s => s.pricing_flags.length > 1)) throw new Error('약제별 가산이 여러 개 선택된 시나리오에서 6개 항목 중 하나를 다시 선택하세요.');
       const data = E.serializeProject(project);
       const blob = new Blob([data], {type: 'application/json;charset=utf-8'});
       const url = URL.createObjectURL(blob); const a = element('a');
@@ -322,6 +383,10 @@
   document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => selectTab(button.dataset.tab)));
   document.querySelectorAll('[data-product-field]').forEach(input => input.addEventListener('input', () => { project.product[input.dataset.productField] = input.value; changed(); }));
   document.querySelectorAll('[data-field]').forEach(input => {
+    if (input.inputMode === 'decimal') {
+      bindNumericInput(input, value => { active()[input.dataset.field] = value; changed(); });
+      return;
+    }
     const event = input.type === 'radio' || input.tagName === 'SELECT' ? 'change' : 'input';
     input.addEventListener(event, () => {
       if (input.type === 'radio' && !input.checked) return;
@@ -331,7 +396,8 @@
     });
   });
   document.querySelectorAll('[data-pricing-flag]').forEach(input => input.addEventListener('change', () => {
-    const flags = new Set(active().pricing_flags); input.checked ? flags.add(input.dataset.pricingFlag) : flags.delete(input.dataset.pricingFlag); active().pricing_flags = [...flags]; changed();
+    if (!input.checked) return;
+    active().pricing_flags = [input.dataset.pricingFlag]; changed();
   }));
   $('scenario-select').addEventListener('change', () => { project.active_scenario_id = $('scenario-select').value; selectedRows = new Set(); populateFields(); renderMaterials(); changed(); });
   $('clone-scenario').addEventListener('click', () => {
@@ -381,18 +447,30 @@
     for (let r = 0; r < rows.length; r++) for (let c = 0; c < rows[r].length && firstCol + c < pasteFields.length; c++) {
       const field = pasteFields[firstCol + c]; let value = rows[r][c];
       if (aliases[field]) { value = aliases[field][value.trim()]; if (!value) { showToast('붙여넣을 선택값을 확인하세요: ' + rows[r][c]); return; } }
+      else if (field === 'amount' || field === 'price') value = numericEntry(value).value;
       updates.push({row: firstRow + r, field, value});
     }
     while (active().materials.length < firstRow + rows.length) active().materials.push(E.makeMaterial('api'));
     for (const update of updates) active().materials[update.row][update.field] = update.value;
     renderMaterials(); changed();
+    const first = $('material-body').children[firstRow];
+    const replacement = first && first.querySelector('[data-material-field="' + target.dataset.materialField + '"]');
+    if (replacement) replacement.focus();
   });
   document.addEventListener('keydown', event => {
+    if (event.target.matches('[data-tab]') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      event.preventDefault();
+      const buttons = [...document.querySelectorAll('[data-tab]')];
+      const current = buttons.indexOf(event.target);
+      const index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
+      selectTab(buttons[index].dataset.tab); buttons[index].focus();
+    }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveFile(); }
     if (event.target.matches('[data-material-field]') && event.key === 'Enter') { event.preventDefault(); event.target.blur(); }
   });
   window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
   renderAll();
+  selectTab('input');
   if (loadNotice) showToast(loadNotice);
   window.PharmaCostApp = {getProject: () => JSON.parse(JSON.stringify(project)), getResult: () => currentResult};
 })();
