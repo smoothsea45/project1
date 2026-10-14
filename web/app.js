@@ -293,18 +293,109 @@
     }
   }
   function renderComposition(result) {
-    const items = [['API', 'api', result.api_unit], ['부형제', 'excipient', result.excipient_unit], ['포자재비', 'packaging', result.packaging_unit], ['공수비', 'labor', result.labor_unit]];
-    $('composition-body').replaceChildren(); $('composition-bar').replaceChildren();
+    const items = [['API', 'api', result.api_unit], ['부형제', 'excipient', result.excipient_unit], ['포장재비', 'packaging', result.packaging_unit], ['공수비', 'labor', result.labor_unit]];
+    const total = result.total_cost;
+    const price = result.pricing.amount;
     const complete = result.total_cost !== null;
+    const positiveCost = complete && total.gt(0);
+    const validPrice = price !== null && price.gt(0);
+    const overPrice = positiveCost && validPrice && total.gt(price);
+    const shareText = share => share === null ? '—' : share.gt(0) && share.lt('0.01') ? '<0.01%' : format(share, 2) + '%';
+    const notices = [];
+    $('composition-body').replaceChildren();
+    $('composition-stack').replaceChildren();
+    $('composition-body').style.gridTemplateRows = items.map(([, , cost]) => {
+      const weight = positiveCost && cost !== null ? cost.div(total).mul(100).toNumber() : 1;
+      return 'minmax(min-content, ' + weight + 'fr)';
+    }).join(' ');
+
+    // The enlarged stack and its labels use the same already-calculated costs.
     for (const [label, cls, cost] of items) {
-      const tr = element('tr'); const labelCell = element('td');
-      labelCell.append(element('span', '', 'legend-dot ' + cls), document.createTextNode(label));
-      const share = complete && result.total_cost.gt(0) && cost !== null ? cost.div(result.total_cost).mul(100) : null;
-      tr.append(labelCell, element('td', format(cost), 'numeric'), element('td', share === null ? '—' : format(share, 2) + '%', 'numeric'));
-      $('composition-body').append(tr);
-      if (share !== null) { const segment = element('span', '', cls); segment.style.width = share.toString() + '%'; segment.title = label + ': ' + format(cost) + '원/T'; $('composition-bar').append(segment); }
+      const share = positiveCost && cost !== null ? cost.div(total).mul(100) : null;
+      const row = element('div', undefined, 'composition-row');
+      row.dataset.item = cls;
+      row.setAttribute('role', 'listitem');
+      const labelNode = element('div', undefined, 'composition-label');
+      const dot = element('span', '', 'legend-dot ' + cls);
+      dot.setAttribute('aria-hidden', 'true');
+      const nameAndShare = element('span');
+      nameAndShare.append(document.createTextNode(label + ' '), element('span', shareText(share), 'composition-share'));
+      labelNode.append(dot, nameAndShare);
+      const amount = element('span', format(cost) + (cost === null ? '' : ' 원/T'), 'composition-amount');
+      amount.title = cost === null ? '이 항목의 입력이 미완성입니다.' : cost.toString() + ' 원/T';
+      row.append(labelNode, amount);
+      $('composition-body').append(row);
+      if (share !== null) {
+        const segment = element('span', undefined, 'composition-segment ' + cls);
+        segment.dataset.item = cls;
+        segment.dataset.share = share.toString();
+        segment.style.height = share.toNumber() + '%';
+        segment.title = label + ' ' + shareText(share) + ' · ' + format(cost) + ' 원/T';
+        $('composition-stack').append(segment);
+      }
     }
-    $('composition-bar').setAttribute('aria-label', complete ? 'API·부형제·포자재비·공수비의 제조원가 구성' : '필수 비용이 미입력되어 비용 구성은 미완성입니다.');
+    $('composition-stack').dataset.state = !complete ? 'incomplete' : positiveCost ? 'ready' : 'zero';
+    $('composition-stack').setAttribute('aria-label', !complete ? '필수 비용 입력이 미완성입니다. 제조원가 구성비를 계산할 수 없습니다.' : positiveCost ? '총 제조원가 기준. 위에서부터 API, 부형제, 포장재비, 공수비 순서입니다.' : '제조원가가 0원입니다. 총 제조원가 기준 구성비는 계산할 수 없습니다.');
+    $('raw-material-total').textContent = format(result.raw_unit) + (result.raw_unit === null ? '' : ' 원/T');
+    const rawShare = positiveCost && result.raw_unit !== null ? result.raw_unit.div(total).mul(100) : null;
+    $('raw-material-share').textContent = shareText(rawShare);
+    $('raw-material-share').title = '총 제조원가 대비 원재료비 비율';
+
+    // An annular SVG avoids rounding or truncating the underlying Decimal data.
+    const namespace = 'http://www.w3.org/2000/svg';
+    const svgNode = (tag, attributes) => {
+      const node = document.createElementNS(namespace, tag);
+      for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
+      return node;
+    };
+    const svg = svgNode('svg', {viewBox: '0 0 200 200', 'aria-hidden': 'true'});
+    svg.append(svgNode('circle', {cx: 100, cy: 100, r: 80, fill: 'none', stroke: '#e3e8eb', 'stroke-width': 28}));
+    let startAngle = -90;
+    const point = (radius, angle) => {
+      const radians = angle * Math.PI / 180;
+      return (100 + radius * Math.cos(radians)).toFixed(6) + ' ' + (100 + radius * Math.sin(radians)).toFixed(6);
+    };
+    function appendSlice(cls, share, label, cost) {
+      if (!share.gt(0)) return;
+      const sweep = share.div(100).mul(360).toNumber();
+      const endAngle = startAngle + sweep;
+      let path;
+      if (share.gte(100)) {
+        path = 'M 100 6 A 94 94 0 1 1 100 194 A 94 94 0 1 1 100 6 Z M 100 34 A 66 66 0 1 0 100 166 A 66 66 0 1 0 100 34 Z';
+      } else {
+        const large = sweep > 180 ? 1 : 0;
+        path = 'M ' + point(94, startAngle) + ' A 94 94 0 ' + large + ' 1 ' + point(94, endAngle) + ' L ' + point(66, endAngle) + ' A 66 66 0 ' + large + ' 0 ' + point(66, startAngle) + ' Z';
+      }
+      const segment = svgNode('path', {d: path, fill: cls === 'remainder' ? '#e3e8eb' : 'var(--' + cls + ')', 'fill-rule': 'evenodd', 'data-item': cls, 'data-share': share.toString()});
+      const title = svgNode('title', {});
+      title.textContent = label + ' ' + shareText(share) + ' · ' + format(cost) + ' 원/T';
+      segment.append(title);
+      svg.append(segment);
+      startAngle = endAngle;
+    }
+    const donut = $('composition-donut');
+    donut.dataset.basis = !complete || !validPrice ? 'unavailable' : overPrice ? 'manufacturing' : 'insurance';
+    const denominator = complete && validPrice ? (overPrice ? total : price) : null;
+    if (denominator !== null) {
+      for (const [label, cls, cost] of items) appendSlice(cls, cost.div(denominator).mul(100), label, cost);
+      if (!overPrice && price.gt(total)) appendSlice('remainder', price.minus(total).div(price).mul(100), '보험약가와 제조원가의 차액', price.minus(total));
+    }
+    donut.replaceChildren(svg);
+    const centerRate = !complete ? '미완성' : !validPrice || result.cost_rate === null ? '계산 불가' : shareText(result.cost_rate);
+    $('donut-rate').textContent = centerRate;
+    $('donut-rate').style.fontSize = centerRate.includes('%') ? Math.max(10, Math.min(25, Math.floor(156 / centerRate.length))) + 'px' : '18px';
+    $('donut-total').textContent = complete ? format(total) + ' 원/T' : '제조원가 미완성';
+    $('composition-remainder').textContent = complete && validPrice ? format(price.minus(total)) + ' 원/T' : '계산 불가';
+    $('donut-note').textContent = !complete ? '보험약가 기준 · 비용 입력 미완성' : !validPrice ? '보험약가 미입력·0·미확인' : overPrice ? '약가 초과 · 도넛은 제조원가 기준' : '보험약가 기준 · ' + format(price) + ' 원/T';
+    if (!complete) notices.push('필수 비용을 입력하면 두 그래프의 비율을 표시합니다. 계산 가능한 항목의 금액은 유지합니다.');
+    else {
+      if (!validPrice) notices.push('보험약가가 없거나 0 또는 미확인 상태여서 도넛의 약가 대비 비율은 계산 불가입니다.');
+      if (!positiveCost) notices.push('제조원가가 0원이므로 오른쪽 구성비와 원재료비 비율은 계산 불가(—)입니다.');
+      if (overPrice) notices.push('제조원가가 보험약가를 초과했습니다. 중앙에는 실제 약가 대비 원가율을 표시하며, 도넛 구간은 제조원가 전체를 기준으로 표시합니다. 회색 차액 구간은 없습니다.');
+    }
+    $('composition-status').textContent = notices.join(' ');
+    $('composition-status').hidden = notices.length === 0;
+    donut.setAttribute('aria-label', notices.length ? centerRate + ', 총 제조원가 ' + format(total) + ' 원/T. ' + notices.join(' ') : '보험약가 ' + format(price) + ' 원/T 기준 API·부형제·포장재비·공수비와 차액. 제조원가율 ' + centerRate + ', 제조원가 ' + format(total) + ' 원/T.');
   }
   function renderComparison() {
     $('comparison-head').replaceChildren(); $('comparison-body').replaceChildren();

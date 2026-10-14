@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=2">
+  <link rel="stylesheet" href="styles.css?v=3">
   <script defer src="vendor/decimal.js"></script>
   <script defer src="engine.js"></script>
-  <script defer src="app.js?v=2"></script>
+  <script defer src="app.js?v=3"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -115,7 +115,29 @@
         <article class="metric-card"><span class="metric-label">계산에 사용한 약가</span><div><strong id="result-price">—</strong><span class="metric-unit">원/T</span></div><p id="pricing-source">사용자 입력값</p></article>
       </div>
       <div class="results-detail-grid">
-        <section class="card composition-card" aria-labelledby="composition-heading"><div class="section-heading"><h2 id="composition-heading">비용 구성</h2><span class="section-note">원/T</span></div><div id="composition-bar" class="composition-bar" role="img" aria-label="비용 구성 비중"></div><table class="composition-table"><caption class="visually-hidden">비용 항목별 금액과 비중</caption><thead><tr><th scope="col">항목</th><th scope="col" class="numeric">금액</th><th scope="col" class="numeric">비중</th></tr></thead><tbody id="composition-body"></tbody></table></section>
+        <section class="card composition-card" aria-labelledby="composition-heading">
+          <div class="section-heading"><h2 id="composition-heading">비용 구성</h2><span class="section-note">원/T</span></div>
+          <div class="composition-charts">
+            <div class="donut-column">
+              <div class="composition-donut-wrap">
+                <div id="composition-donut" class="composition-donut" role="img" aria-label="보험약가 대비 비용 구성"></div>
+                <div class="donut-center"><strong id="donut-rate">—</strong><span class="donut-center-label">제조원가율</span><span id="donut-total">—</span></div>
+              </div>
+              <p id="donut-note" class="donut-note">보험약가 기준</p>
+              <p class="composition-remainder-note"><span class="legend-dot remainder" aria-hidden="true"></span><span>약가와의 차액</span><span id="composition-remainder">—</span></p>
+            </div>
+            <div class="stack-column">
+              <h3 class="composition-subheading">제조원가 구성</h3>
+              <p class="composition-denominator">비율 기준: 총 제조원가</p>
+              <div class="stack-detail">
+                <div id="composition-stack" class="composition-stack" role="img" aria-label="제조원가 항목별 구성"></div>
+                <div id="composition-body" class="composition-labels" role="list" aria-label="제조원가 항목별 비율과 금액"></div>
+              </div>
+              <div class="raw-material-summary"><span>원재료비 합계 <span id="raw-material-share">—</span></span><strong id="raw-material-total">—</strong></div>
+            </div>
+          </div>
+          <p id="composition-status" class="composition-status" role="status" hidden></p>
+        </section>
         <section class="card calculation-notes" aria-labelledby="basis-heading"><div class="section-heading"><h2 id="basis-heading">약가 계산 근거</h2><span id="pricing-calculation-badge" class="status-pill warning">규정 미확인</span></div><dl class="basis-list"><div><dt>적용 규정</dt><dd id="pricing-rule">규정 미확인 · 직접 입력</dd></div><div><dt>기준일</dt><dd id="pricing-date">—</dd></div><div><dt>가산 종료 후 원가율</dt><dd id="result-post-rate">입력 없음</dd></div></dl><div id="pricing-steps" class="pricing-steps">우리 제품 예상 약가를 입력하면 제조원가율을 계산합니다.</div><div class="assumptions-note"><span class="note-symbol" aria-hidden="true">i</span><p>실제 투입량으로 계산합니다. 염·수화물 및 역가 보정은 자동 적용하지 않습니다. 보험약가 대비 원가율은 실제 판매이익률과 다릅니다.</p></div></section>
       </div>
     </section>
