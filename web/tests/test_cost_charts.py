@@ -48,12 +48,12 @@ def assert_row(page, item, label, percentage, amount):
     row = chart_row(page, item)
     expect(row).to_contain_text(label)
     expect(row.locator(".composition-share")).to_have_text(percentage)
-    expect(row.locator(".composition-amount")).to_contain_text(amount)
+    expect(row.locator(".composition-amount")).to_have_text(f"{float(amount):,.2f} 원/T")
 
 
 def test_real_example_uses_insurance_basis_for_donut_and_cost_basis_for_stack(page):
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("26.67%")
+    expect(page.locator("#donut-rate")).to_have_text("26.7%")
     expect(page.locator("#donut-total")).to_contain_text("80")
     expect(page.locator("#donut-total")).to_contain_text("원/T")
     for item, insurance_share, cost_share, amount, name in [
@@ -64,7 +64,7 @@ def test_real_example_uses_insurance_basis_for_donut_and_cost_basis_for_stack(pa
     ]:
         assert donut_share(page, item) == pytest.approx(insurance_share)
         assert stack_share(page, item) == pytest.approx(cost_share)
-        assert_row(page, item, name, f"{cost_share:g}%", amount)
+        assert_row(page, item, name, f"{cost_share:.1f}%", amount)
     assert donut_share(page, "remainder") == pytest.approx(220 / 300 * 100)
     remainder_color = page.locator('#composition-donut [data-item="remainder"]').evaluate(
         "node => getComputedStyle(node).fill"
@@ -73,7 +73,7 @@ def test_real_example_uses_insurance_basis_for_donut_and_cost_basis_for_stack(pa
     assert len(channels) == 3 and min(channels) >= 200 and max(channels) - min(channels) <= 20
     expect(page.locator("#raw-material-total")).to_contain_text("50")
     expect(page.locator("#raw-material-share")).to_contain_text("62.5%")
-    expect(page.locator(".composition-denominator")).to_contain_text("총 제조원가")
+    expect(page.locator("#tab-results .composition-denominator")).to_contain_text("총 제조원가")
     assert_finite_chart(page)
 
 
@@ -102,13 +102,13 @@ def test_shared_palette_and_vertical_stack_order(page):
 def test_material_edit_updates_both_charts_without_static_data(page):
     page.locator('[data-material-field="amount"]').nth(0).fill("0")
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("20%")
+    expect(page.locator("#donut-rate")).to_have_text("20.0%")
     expect(page.locator("#donut-total")).to_contain_text("60")
     assert donut_share(page, "api") == pytest.approx(20 / 300 * 100)
     assert stack_share(page, "api") == pytest.approx(20 / 60 * 100)
-    assert_row(page, "api", "API", "33.33%", "20")
+    assert_row(page, "api", "API", "33.3%", "20")
     expect(page.locator("#raw-material-total")).to_contain_text("30")
-    expect(page.locator("#raw-material-share")).to_contain_text("50%")
+    expect(page.locator("#raw-material-share")).to_contain_text("50.0%")
 
 
 def test_insurance_price_edit_changes_donut_but_keeps_cost_composition(page):
@@ -117,7 +117,7 @@ def test_insurance_price_edit_changes_donut_but_keeps_cost_composition(page):
     input_tab(page)
     page.locator("#manual-price").fill("200")
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("40%")
+    expect(page.locator("#donut-rate")).to_have_text("40.0%")
     assert donut_share(page, "api") == pytest.approx(20)
     assert donut_share(page, "remainder") == pytest.approx(60)
     assert {item: stack_share(page, item) for item in ITEMS} == original_stack
@@ -127,7 +127,7 @@ def test_yield_changes_actual_cost_values_not_total_cost_proportions(page):
     page.locator("#yield-percent").fill("80")
     results(page)
     expect(page.locator("#donut-total")).to_contain_text("100")
-    expect(page.locator("#donut-rate")).to_have_text("33.33%")
+    expect(page.locator("#donut-rate")).to_have_text("33.3%")
     for item, share, amount, label in [
         ("api", 50, "50", "API"),
         ("excipient", 12.5, "12.5", "부형제"),
@@ -135,7 +135,7 @@ def test_yield_changes_actual_cost_values_not_total_cost_proportions(page):
         ("labor", 25, "25", "공수비"),
     ]:
         assert stack_share(page, item) == pytest.approx(share)
-        assert_row(page, item, label, f"{share:g}%", amount)
+        assert_row(page, item, label, f"{share:.1f}%", amount)
     expect(page.locator("#raw-material-total")).to_contain_text("62.5")
     expect(page.locator("#raw-material-share")).to_contain_text("62.5%")
 
@@ -183,7 +183,7 @@ def test_zero_manufacturing_cost_shows_zero_rate_and_remainder_without_fake_stac
     page.locator("#batch-packaging").fill("0")
     page.locator("#batch-labor").fill("0")
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("0%")
+    expect(page.locator("#donut-rate")).to_have_text("0.0%")
     expect(page.locator("#donut-total")).to_contain_text("0")
     assert donut_share(page, "remainder") == pytest.approx(100)
     expect(page.locator("#composition-stack [data-item]")).to_have_count(0)
@@ -208,7 +208,7 @@ def test_zero_cost_and_zero_price_remain_undefined_rate_without_any_chart_segmen
 def test_cost_greater_than_insurance_keeps_actual_rate_and_explicit_overflow_basis(page):
     page.locator("#manual-price").fill("40")
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("200%")
+    expect(page.locator("#donut-rate")).to_have_text("200.0%")
     expect(page.locator("#donut-total")).to_contain_text("80")
     expect(page.locator('#composition-donut [data-item="remainder"]')).to_have_count(0)
     for item, share in zip(ITEMS, [50, 12.5, 12.5, 25]):
@@ -222,7 +222,7 @@ def test_cost_greater_than_insurance_keeps_actual_rate_and_explicit_overflow_bas
 def test_cost_equal_to_insurance_shows_full_cost_ring_without_remainder(page):
     page.locator("#manual-price").fill("80")
     results(page)
-    expect(page.locator("#donut-rate")).to_have_text("100%")
+    expect(page.locator("#donut-rate")).to_have_text("100.0%")
     expect(page.locator('#composition-donut [data-item="remainder"]')).to_have_count(0)
     assert sum(donut_share(page, item) for item in ITEMS) == pytest.approx(100)
     assert_finite_chart(page)

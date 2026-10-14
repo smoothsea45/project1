@@ -84,8 +84,8 @@ def test_first_open_fictitious_example_and_three_distinct_pages(page):
     expect(page.locator("#tab-comparison")).to_be_hidden()
     results(page)
     expect(page.locator("#tab-input")).to_be_hidden()
-    expect(page.locator("#result-cost")).to_have_text("80")
-    expect(page.locator("#result-rate")).to_have_text("26.67")
+    expect(page.locator("#result-cost")).to_have_text("80.00")
+    expect(page.locator("#result-rate")).to_have_text("26.7")
     expect(page.locator("#tab-comparison")).to_be_hidden()
     comparison(page)
     expect(page.locator("#tab-results")).to_be_hidden()
@@ -159,7 +159,7 @@ def test_root_entry_redirects_into_working_ui(page, site_url):
     page.goto(site_url + "/")
     page.wait_for_url(site_url + "/web/index.html")
     expect(page.locator("h1")).to_contain_text("의약품 제조원가율")
-    expect(page.locator("#api-unit")).to_have_text("40")
+    expect(page.locator("#api-unit")).to_have_text("40.00")
 
 
 def test_editing_recalculates_before_focus_moves(page):
@@ -170,9 +170,9 @@ def test_editing_recalculates_before_focus_moves(page):
     expect(page.locator("#api-unit")).to_have_text("미완성")
     amount.press_sequentially("20")
     expect(amount).to_be_focused()
-    expect(page.locator("#api-unit")).to_have_text("20")
-    expect(row.locator('[data-result-field="batch_cost"]')).to_have_text("2,000,000")
-    expect(row.locator('[data-result-field="unit_cost"]')).to_have_text("20")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
+    expect(row.locator('[data-result-field="batch_cost"]')).to_have_text("2,000,000.00")
+    expect(row.locator('[data-result-field="unit_cost"]')).to_have_text("20.00")
     assert scenario(page)["materials"][0]["amount"] == "20"
 
 
@@ -181,14 +181,14 @@ def test_shared_yield_adjusts_all_unit_costs_not_batch_totals(page):
     row = add_material(page)
     expect(page.locator("#yield-percent")).to_have_value("100")
     page.locator("#yield-percent").fill("80")
-    expect(page.locator("#api-batch")).to_have_text("2,000,000")
-    expect(row.locator('[data-result-field="batch_cost"]')).to_have_text("2,000,000")
-    expect(row.locator('[data-result-field="unit_cost"]')).to_have_text("25")
-    expect(page.locator("#packaging-unit")).to_have_text("12.5")
-    expect(page.locator("#labor-unit")).to_have_text("25")
+    expect(page.locator("#api-batch")).to_have_text("2,000,000.00")
+    expect(row.locator('[data-result-field="batch_cost"]')).to_have_text("2,000,000.00")
+    expect(row.locator('[data-result-field="unit_cost"]')).to_have_text("25.00")
+    expect(page.locator("#packaging-unit")).to_have_text("12.50")
+    expect(page.locator("#labor-unit")).to_have_text("25.00")
     results(page)
-    expect(page.locator("#result-cost")).to_have_text("62.5")
-    expect(page.locator("#result-rate")).to_have_text("20.83")
+    expect(page.locator("#result-cost")).to_have_text("62.50")
+    expect(page.locator("#result-rate")).to_have_text("20.8")
 
 
 @pytest.mark.parametrize(
@@ -206,9 +206,9 @@ def test_price_units_and_common_foreign_exchange(page, unit, price, label):
     row = add_material(page, price=price, unit=unit)
     expect(row.locator('[data-material-field="price_unit"]')).to_have_value(unit)
     expect(row.locator('[data-material-field="price_unit"] option:checked')).to_have_text(label)
-    expect(page.locator("#api-unit")).to_have_text("20")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
     page.locator("#exchange-rate").fill("2000")
-    expect(page.locator("#api-unit")).to_have_text("40" if unit.startswith("usd") else "20")
+    expect(page.locator("#api-unit")).to_have_text("40.00" if unit.startswith("usd") else "20.00")
 
 
 def test_table_columns_add_multiple_apis_excipients_and_selected_delete(page):
@@ -219,15 +219,15 @@ def test_table_columns_add_multiple_apis_excipients_and_selected_delete(page):
     add_material(page)
     add_material(page, amount="10", price="2000000")
     add_material(page, kind="excipient", amount="100", price="100000")
-    expect(page.locator("#api-unit")).to_have_text("40")
-    expect(page.locator("#excipient-unit")).to_have_text("10")
-    expect(page.locator("#excipient-batch")).to_have_text("1,000,000")
+    expect(page.locator("#api-unit")).to_have_text("40.00")
+    expect(page.locator("#excipient-unit")).to_have_text("10.00")
+    expect(page.locator("#excipient-batch")).to_have_text("1,000,000.00")
     page.get_by_role("checkbox", name="원료 1행 선택", exact=True).check()
     page.get_by_role("checkbox", name="원료 3행 선택", exact=True).check()
     page.locator("#delete-materials").click()
     expect(page.locator("#material-body tr")).to_have_count(1)
-    expect(page.locator("#api-unit")).to_have_text("20")
-    expect(page.locator("#excipient-unit")).to_have_text("0")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
+    expect(page.locator("#excipient-unit")).to_have_text("0.00")
     page.locator("#select-all-materials").check()
     page.locator("#delete-materials").click()
     expect(page.locator("#material-body tr")).to_have_count(0)
@@ -242,8 +242,8 @@ def test_clipboard_table_paste_expands_rows_and_converts_choices(page):
     row.locator('[data-material-field="kind"]').focus()
     page.keyboard.press("Control+v")
     expect(page.locator("#material-body tr")).to_have_count(2)
-    expect(page.locator("#api-unit")).to_have_text("20")
-    expect(page.locator("#excipient-unit")).to_have_text("100")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
+    expect(page.locator("#excipient-unit")).to_have_text("100.00")
     assert [m["name"] for m in scenario(page)["materials"]] == ["복합 A", "기제 B"]
 
 
@@ -270,9 +270,9 @@ def test_large_inputs_format_commas_without_changing_numeric_data(page):
     expect(row.locator('[data-material-field="price"]')).to_have_value("1,000,000")
     assert scenario(page)["materials"][0]["amount"] == "1234.5000"
     assert scenario(page)["materials"][0]["price"] == "1000000"
-    expect(page.locator("#api-unit")).to_have_text("1,234.5")
+    expect(page.locator("#api-unit")).to_have_text("1,234.50")
     results(page)
-    expect(page.locator("#result-cost")).to_have_text("1,264.5")
+    expect(page.locator("#result-cost")).to_have_text("1,264.50")
 
 
 def test_comma_formatting_preserves_precision_through_clone_reload_and_json(page, tmp_path):
@@ -358,7 +358,7 @@ def test_malformed_numeric_text_remains_visible_and_invalid(page, raw):
     price.fill("1000000")
     expect(price).to_have_value("1,000,000")
     expect(price).not_to_have_attribute("aria-invalid", "true")
-    expect(page.locator("#api-unit")).to_have_text("20")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
 
 
 def test_comma_formatted_tsv_paste_normalizes_model_and_preserves_focus(page):
@@ -373,7 +373,7 @@ def test_comma_formatted_tsv_paste_normalizes_model_and_preserves_focus(page):
     assert scenario(page)["materials"][0]["amount"] == "1234.5000"
     assert scenario(page)["materials"][0]["price"] == "1000000"
     expect(page.locator('[data-material-field="kind"]')).to_be_focused()
-    expect(page.locator("#api-unit")).to_have_text("1,234.5")
+    expect(page.locator("#api-unit")).to_have_text("1,234.50")
 
 
 def test_cloned_scenario_keeps_original_and_compares_side_by_side(page):
@@ -395,8 +395,8 @@ def test_cloned_scenario_keeps_original_and_compares_side_by_side(page):
     expect(page.locator("#comparison-head th")).to_have_count(3)
     expect(page.locator("#comparison-head th").nth(2)).to_have_text("API 단가 절감안")
     cost_row = page.locator("#comparison-body tr").filter(has=page.get_by_role("rowheader", name="제조원가 (원/T)", exact=True))
-    expect(cost_row.locator("td").nth(0)).to_have_text("50")
-    expect(cost_row.locator("td").nth(1)).to_have_text("47.5")
+    expect(cost_row.locator("td").nth(0)).to_have_text("50.00")
+    expect(cost_row.locator("td").nth(1)).to_have_text("47.50")
     page.locator("#tab-button-input").click()
     page.locator("#scenario-select").select_option(original["id"])
     expect(page.locator('[data-material-field="price"]')).to_have_value("1,000,000")
@@ -413,16 +413,16 @@ def test_manual_price_and_unverified_automatic_mode_are_distinct(page):
     expect(page.locator("#manual-price")).to_be_disabled()
     expect(page.locator("#pricing-status")).to_have_text("자동 산정 미확인")
     results(page)
-    expect(page.locator("#result-cost")).to_have_text("50")
+    expect(page.locator("#result-cost")).to_have_text("50.00")
     expect(page.locator("#result-price")).to_have_text("미확인")
     expect(page.locator("#result-rate")).to_have_text("계산 불가")
     page.locator("#tab-button-input").click()
     page.locator("#pricing-mode").select_option("manual")
     expect(page.locator("#manual-price")).to_have_value("300")
     results(page)
-    expect(page.locator("#result-price")).to_have_text("300")
+    expect(page.locator("#result-price")).to_have_text("300.00")
     expect(page.locator("#pricing-source")).to_have_text("사용자 입력값")
-    expect(page.locator("#result-rate")).to_have_text("16.67")
+    expect(page.locator("#result-rate")).to_have_text("16.7")
 
 
 @pytest.mark.parametrize("price", ["", "0"])
@@ -432,7 +432,7 @@ def test_missing_or_zero_price_retains_cost_without_cost_rate(page, price):
     page.locator("#manual-price").fill(price)
     expect(page.locator("#input-errors")).to_be_visible()
     results(page)
-    expect(page.locator("#result-cost")).to_have_text("50")
+    expect(page.locator("#result-cost")).to_have_text("50.00")
     expect(page.locator("#result-rate")).to_have_text("계산 불가")
 
 
@@ -464,18 +464,19 @@ def test_missing_exchange_highlights_for_dollar_material(page):
     expect(page.locator("#exchange-rate")).to_have_attribute("aria-invalid", "true")
     expect(page.locator("#api-unit")).to_have_text("미완성")
     page.locator("#exchange-rate").fill("1000")
-    expect(page.locator("#api-unit")).to_have_text("20")
+    expect(page.locator("#api-unit")).to_have_text("20.00")
 
 
-def test_rate_over_100_and_post_price_without_goal_metrics(page):
+def test_rate_over_100_retained_without_pricing_basis_or_goal_metrics(page):
     setup_base(page)
     add_material(page)
     page.locator("#manual-price").fill("25")
     page.locator(".secondary-price summary").click()
     page.locator("#post-price").fill("20")
     results(page)
-    expect(page.locator("#result-rate")).to_have_text("200")
-    expect(page.locator("#result-post-rate")).to_have_text("250%")
+    expect(page.locator("#result-rate")).to_have_text("200.0")
+    expect(page.locator("#result-post-rate, #pricing-rule, #pricing-date, #pricing-steps")).to_have_count(0)
+    assert scenario(page)["post_price"] == "20"
     expect(page.locator("#target-rate, #result-gap, #result-savings, #result-target-status")).to_have_count(0)
     comparison(page)
     assert "목표" not in page.locator("#comparison-body").inner_text()
@@ -599,7 +600,7 @@ def test_all_loaded_assets_are_local_and_operations_need_no_outside_service(page
     setup_base(page)
     add_material(page)
     results(page)
-    expect(page.locator("#result-cost")).to_have_text("50")
+    expect(page.locator("#result-cost")).to_have_text("50.00")
     resources = page.evaluate("performance.getEntriesByType('resource').map(item => item.name)")
     assert resources
     assert all(urlparse(url).hostname == "127.0.0.1" for url in resources)

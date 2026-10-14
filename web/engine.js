@@ -20,7 +20,7 @@
     usd_kg: { divisor: '1000000', foreign: true }
   });
   const FLAGS = Object.freeze(['originator_data', 'improved', 'biologic', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
-  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'materials'];
+  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'materials'];
   const MATERIAL_KEYS = ['id', 'kind', 'name', 'supplier', 'amount', 'price', 'price_unit'];
   const NUMBER_FIELDS = ['batch_size', 'yield_percent', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor'];
   const blank = value => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
@@ -40,7 +40,7 @@
   function makeScenario(options) {
     const supplied = typeof options === 'string' ? { name: options } : (options || {});
     const result = Object.assign({
-      id: newId(), name: '기본안', batch_size: null, yield_percent: '100', exchange_rate: null,
+      id: newId(), name: '기본안', batch_size: null, yield_percent: '100', packaging_form: '', exchange_rate: null,
       original_price: null, manual_price: null, post_price: null, target_rate: '20',
       batch_packaging: '0', batch_labor: '0', pricing_mode: 'manual', company_type: '',
       identical_count_band: '', pricing_flags: [], materials: []
@@ -50,9 +50,15 @@
     return result;
   }
 
+  function normalizeScenario(scenario) {
+    // Version 1 projects and browser drafts created before this field remain usable.
+    if (scenario !== null && typeof scenario === 'object' && !Array.isArray(scenario) && !Object.prototype.hasOwnProperty.call(scenario, 'packaging_form')) scenario.packaging_form = '';
+    return scenario;
+  }
+
   function makeProject(options) {
     const supplied = options || {};
-    const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => copy(scenario)) : [makeScenario()];
+    const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => normalizeScenario(copy(scenario))) : [makeScenario()];
     return Object.assign({
       format: FORMAT, schema_version: VERSION,
       product: { product_name: '', notes: '' }, scenarios,
@@ -62,7 +68,7 @@
 
   function createExampleProject() {
     const scenario = makeScenario({
-      name: '가상 예제 · 기본안', batch_size: '100000', yield_percent: '100', exchange_rate: '1350',
+      name: '가상 예제 · 기본안', batch_size: '100000', yield_percent: '100', packaging_form: 'PTP 10T × 3', exchange_rate: '1350',
       original_price: '600', manual_price: '300', post_price: '250', target_rate: '20',
       batch_packaging: '1000000', batch_labor: '2000000', company_type: 'general', identical_count_band: 'lt14',
       materials: [
@@ -83,7 +89,7 @@
   function cloneScenario(project, id, name) {
     const original = project.scenarios.find(scenario => scenario.id === id);
     if (!original) throw new Error('복제할 시나리오를 찾지 못했습니다.');
-    const duplicate = copy(original);
+    const duplicate = normalizeScenario(copy(original));
     duplicate.id = newId();
     duplicate.name = name === undefined ? original.name + ' · 복제' : name;
     duplicate.materials.forEach(material => { material.id = newId(); });
@@ -289,11 +295,13 @@
     const ids = new Set();
     project.scenarios.forEach((scenario, index) => {
       const path = '시나리오 ' + (index + 1);
+      normalizeScenario(scenario);
       object(scenario, path, SCENARIO_KEYS);
       string(scenario.id, path + ' ID', true);
       if (ids.has(scenario.id)) fileError('시나리오 ID가 중복되어 있습니다.');
       ids.add(scenario.id);
       string(scenario.name, path + ' 이름', true);
+      string(scenario.packaging_form, path + ' 포장형태');
       choice(scenario.pricing_mode, path + ' 약가 방식', ['manual', 'official']);
       choice(scenario.company_type, path + ' 기업 구분', ['', 'innovative', 'near', 'general']);
       choice(scenario.identical_count_band, path + ' 동일제제 품목 수', ['', 'lt14', 'ge14']);

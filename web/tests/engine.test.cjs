@@ -244,6 +244,75 @@ test('JSON save/load preserves all pricing conditions and independent scenarios'
   assert.equal(loaded.schema_version, 1);
 });
 
+test('new scenarios have an empty packaging form while the editable example has one', () => {
+  assert.equal(E.makeScenario().packaging_form, '');
+  assert.equal(E.makeProject().scenarios[0].packaging_form, '');
+  const project = E.createExampleProject();
+  assert.ok(project.scenarios.every(item => item.packaging_form === 'PTP 10T × 3'));
+  equal(E.calculate(project.scenarios[0]).total_cost, '80');
+});
+
+test('packaging form remains scenario-specific after cloning and editing', () => {
+  const project = E.makeProject({ scenarios: [scenario({ packaging_form: 'PTP 10T × 3' })] });
+  const original = JSON.stringify(project.scenarios[0]);
+  const cloned = E.cloneScenario(project, project.scenarios[0].id, '병 포장안');
+  assert.equal(cloned.packaging_form, 'PTP 10T × 3');
+  cloned.packaging_form = 'HDPE 병 100T';
+  assert.equal(JSON.stringify(project.scenarios[0]), original);
+  equal(E.calculate(cloned).total_cost, E.calculate(project.scenarios[0]).total_cost);
+});
+
+test('JSON roundtrip preserves distinct packaging forms, Unicode and multiline text', () => {
+  const project = E.createExampleProject();
+  project.scenarios[0].packaging_form = 'PTP 10T × 3\n알루미늄 포장';
+  project.scenarios[1].packaging_form = 'HDPE 병 100T';
+  const loaded = E.parseProject(E.serializeProject(project));
+  assert.deepEqual(loaded, project);
+  assert.equal(loaded.scenarios[0].packaging_form, 'PTP 10T × 3\n알루미늄 포장');
+  assert.equal(loaded.scenarios[1].packaging_form, 'HDPE 병 100T');
+});
+
+test('existing schema version 1 files and browser drafts normalize missing packaging forms', () => {
+  const legacy = E.createExampleProject();
+  legacy.scenarios.forEach(item => { delete item.packaging_form; });
+  const before = JSON.stringify(legacy);
+  const loaded = E.parseProject(before);
+  assert.equal(loaded.schema_version, 1);
+  assert.ok(loaded.scenarios.every(item => item.packaging_form === ''));
+  assert.equal(JSON.stringify(legacy), before);
+  const withoutAddedField = JSON.parse(JSON.stringify(loaded));
+  withoutAddedField.scenarios.forEach(item => { delete item.packaging_form; });
+  assert.deepEqual(withoutAddedField, legacy);
+  equal(E.calculate(loaded.scenarios[0]).total_cost, '80');
+  assert.deepEqual(E.parseProject(E.serializeProject(loaded)), loaded);
+});
+
+test('project construction and clone support pre-existing scenarios without the new field', () => {
+  const oldScenario = scenario();
+  delete oldScenario.packaging_form;
+  const project = E.makeProject({ scenarios: [oldScenario] });
+  assert.equal(project.scenarios[0].packaging_form, '');
+  assert.equal(Object.hasOwn(oldScenario, 'packaging_form'), false);
+  delete project.scenarios[0].packaging_form;
+  const cloned = E.cloneScenario(project, project.scenarios[0].id);
+  assert.equal(cloned.packaging_form, '');
+  assert.equal(Object.hasOwn(project.scenarios[0], 'packaging_form'), false);
+  const loaded = E.parseProject(E.serializeProject(project));
+  assert.ok(loaded.scenarios.every(item => item.packaging_form === ''));
+});
+
+test('packaging form applies the same optional string validation as other text fields', () => {
+  const project = E.makeProject();
+  for (const invalid of [null, 30, true, {}, []]) {
+    project.scenarios[0].packaging_form = invalid;
+    assert.throws(() => E.serializeProject(project), /포장형태.*문자열/);
+  }
+  for (const valid of ['', ' ', 'PTP 10T × 3', '설명'.repeat(10000)]) {
+    project.scenarios[0].packaging_form = valid;
+    assert.equal(E.parseProject(E.serializeProject(project)).scenarios[0].packaging_form, valid);
+  }
+});
+
 test('example compares 80 KRW basic and 60 KRW API savings while selecting original', () => {
   const project = E.createExampleProject();
   assert.equal(project.scenarios.length, 2);
