@@ -90,7 +90,7 @@
 3. **Branch**를 `main`, 폴더를 **/(root)**로 선택하고 **Save**를 누릅니다.
 4. 배포가 끝나면 같은 화면에 표시되는 사이트 링크를 엽니다.
 
-이 저장소의 예상 주소는 `https://smoothsea45.github.io/project1/`입니다. **Pages 설정·배포 완료와 실제 공개 주소의 동작은 아직 확인하지 않았습니다.** 저장소 설정·권한·GitHub 요금제에 따라 Pages 사용 여부가 달라질 수 있습니다. 최초 구성에는 GitHub Actions 파일이 필요하지 않습니다.
+이 저장소는 [https://smoothsea45.github.io/project1/](https://smoothsea45.github.io/project1/)에서 사용할 수 있습니다. 비용 구성 그래프 변경 후 공개 페이지의 HTML·JavaScript·CSS가 검증한 파일과 일치함을 확인했습니다. 이전 화면이 보이면 `Ctrl+F5`로 새로고침하세요. 다른 저장소에 배포할 때는 설정·권한·GitHub 요금제에 따라 Pages 사용 여부가 달라질 수 있습니다. 최초 구성에는 GitHub Actions 파일이 필요하지 않습니다.
 
 Pages에서는 프로그램 파일을 웹에서 내려받지만, 입력값 계산과 프로젝트 파일 처리는 브라우저 안에서 이루어집니다. 인터넷이 없는 PC에서는 앞의 ZIP 다운로드 방식을 사용하세요.
 

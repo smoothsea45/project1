@@ -44,7 +44,7 @@ node --test web/tests/engine.test.cjs
 
 브라우저 테스트는 내부 HTTP 서버에서 수행했다. 이 클라우드의 Chromium 관리 정책은 `file://` 직접 실행을 `ERR_BLOCKED_BY_ADMINISTRATOR`로 차단하므로 이 경로와 실제 Windows 직접 실행은 검증 완료로 주장하지 않는다. 웹 파일은 상대 경로의 일반 HTML·CSS·JavaScript이며 외부 서버·API를 사용하지 않는다.
 
-GitHub Pages 게시와 공개 주소의 실행 검증은 저장소 관리자가 Pages를 활성화한 뒤 수행해야 한다. 공식 약가 원문 조사는 [조사 기록](pricing-reference.md)의 접속 차단을 해결한 후 이어가야 한다.
+초기 웹 구현 검증 당시에는 GitHub Pages가 활성화되기 전이었다. 이후 공개 페이지 확인 결과는 아래 비용 구성 그래프 검증에 기록한다. 공식 약가 원문 조사는 [조사 기록](pricing-reference.md)의 접속 차단을 해결한 후 이어가야 한다.
 
 ## 숫자 표시와 입력 화면 수정 검증
 
@@ -68,3 +68,4 @@ node --test web/tests/engine.test.cjs
 - 약가 미입력·0·음수·미확인, 제조원가 0, 약가와 같은 원가, 약가 초과, 비용 미완성과 매우 크거나 작은 값에서 오류·NaN·Infinity 없이 표시되는지 확인했다.
 - 약가를 초과하는 경우 도넛만 제조원가 기준으로 전환했다고 명시하고, 중앙의 실제 약가 대비 원가율을 유지한다. 음수 차액은 회색 구간으로 표시하지 않는다.
 - 390·1024·1440px 화면에서 라벨·비율·금액의 겹침과 잘림을 확인했다. 기본 계산 결과 화면을 실제 Chromium으로 렌더링하여 기존 카드 배치와 새 그래프를 확인했다.
+- GitHub `main`에 반영한 뒤 공개 주소 `https://smoothsea45.github.io/project1/`의 HTML에서 새 그래프와 새 파일 버전을 확인했다. 공개 JavaScript·CSS는 로컬에서 검증한 파일과 바이트 단위로 일치했다.
