@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#153c4d">
+  <title>의약품 제조원가율 시뮬레이터</title>
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="vendor/decimal.js"></script>
+  <script defer src="engine.js"></script>
+  <script defer src="app.js"></script>
+</head>
+<body>
+  <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
+  <header class="app-header">
+    <div class="brand">
+      <div class="brand-mark" aria-hidden="true"><svg width="23" height="23" viewBox="0 0 24 24" fill="none"><path d="M8 4h8M9 4v5l-5 8a2 2 0 0 0 1.7 3h12.6A2 2 0 0 0 20 17l-5-8V4M7 14h10" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 17h4" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg></div>
+      <div><h1>의약품 제조원가율 <span>시뮬레이터</span></h1><p>처방부터 배치 원가까지, 한눈에 비교하세요.</p></div>
+    </div>
+    <nav class="file-actions" aria-label="프로젝트 파일">
+      <button type="button" id="new-project" class="button subtle">새 프로젝트</button>
+      <button type="button" id="open-project" class="button subtle">파일 열기</button>
+      <button type="button" id="save-project" class="button primary"><svg width="16" height="16" viewBox="0 0 20 20" fill="none" aria-hidden="true"><path d="M10 3v9m-3-3 3 3 3-3M4 13v4h12v-4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>프로젝트 저장</button>
+      <button type="button" id="load-example" class="button subtle example-button">예제 열기</button>
+      <input id="open-file" type="file" accept=".json,application/json" hidden>
+    </nav>
+  </header>
+
+  <main class="workspace">
+    <div id="example-banner" class="example-banner" hidden><span class="example-tag">가상 예제</span><span>사용법을 살펴보는 예제입니다. 실제 견적이나 보험약가가 아닙니다.</span></div>
+    <div class="scenario-toolbar">
+      <div class="scenario-picker"><label for="scenario-select">현재 시나리오</label><select id="scenario-select" aria-label="현재 시나리오"></select></div>
+      <div class="scenario-actions"><button type="button" id="clone-scenario" class="button outline"><span aria-hidden="true">＋</span>현재 입력 복제</button><button type="button" id="rename-scenario" class="button text-button">이름 변경</button><button type="button" id="delete-scenario" class="button text-button danger">삭제</button></div>
+      <span id="project-status" class="save-state" role="status">새 프로젝트</span>
+    </div>
+    <nav class="page-tabs" role="tablist" aria-label="작업 페이지">
+      <button type="button" id="tab-button-input" class="tab active" role="tab" aria-selected="true" aria-controls="tab-input" data-tab="input"><span class="tab-number">01</span>입력</button>
+      <button type="button" id="tab-button-results" class="tab" role="tab" aria-selected="false" aria-controls="tab-results" data-tab="results"><span class="tab-number">02</span>결과 · 시나리오 비교</button>
+      <span class="tab-hint">입력한 값으로 바로 계산합니다.</span>
+    </nav>
+
+    <section id="tab-input" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-input">
+      <div class="context-grid">
+        <section class="card product-card" aria-label="제품 정보">
+          <div class="field"><label for="product-name">제품명</label><input id="product-name" data-product-field="product_name" type="text" placeholder="예: 제품 A 20mg"></div>
+          <div class="field"><label for="product-notes">비고</label><input id="product-notes" data-product-field="notes" type="text" placeholder="함량, 제형 등 필요한 설명"></div>
+        </section>
+        <section class="card common-card" aria-label="공통 계산 조건">
+          <div class="field"><label for="batch-size">배치사이즈 <span class="label-unit">T</span></label><input id="batch-size" data-field="batch_size" type="text" inputmode="decimal" placeholder="100,000" aria-describedby="batch-help"><small id="batch-help">손실 발생 전 기준 수량</small></div>
+          <div class="field"><label for="yield-percent">제조수율 <span class="label-unit">%</span></label><input id="yield-percent" data-field="yield_percent" type="text" inputmode="decimal" placeholder="100"><small>원료 · 포자재 · 공수에 적용</small></div>
+          <div class="field"><label for="exchange-rate">달러 환율 <span class="label-unit">원/USD</span></label><input id="exchange-rate" data-field="exchange_rate" type="text" inputmode="decimal" placeholder="1,400"><small>달러 단가 원료에 공통 적용</small></div>
+        </section>
+      </div>
+
+      <section class="card pricing-card" aria-labelledby="pricing-heading">
+        <div class="section-heading"><div><h2 id="pricing-heading">약가 조건</h2><span class="section-note">오리지널 약가와 가산 조건을 기록합니다.</span></div><span id="pricing-status" class="status-pill">사용자 입력</span></div>
+        <div class="pricing-layout">
+          <div class="pricing-amounts">
+            <div class="field"><label for="original-price">오리지널 약가 <span class="label-unit">원/T</span></label><input id="original-price" data-field="original_price" type="text" inputmode="decimal" placeholder="기준 약가 입력"></div>
+            <div class="field"><label for="pricing-mode">계산에 사용할 약가</label><select id="pricing-mode" data-field="pricing_mode"><option value="manual">예상 약가 직접 입력</option><option value="official">자동 산정 (규정 확인 필요)</option></select></div>
+            <div class="field"><label for="manual-price">우리 제품 예상 약가 <span class="label-unit">원/T</span></label><input id="manual-price" data-field="manual_price" type="text" inputmode="decimal" placeholder="직접 입력값"></div>
+            <div class="field"><label for="target-rate">목표 제조원가율 <span class="label-unit">%</span></label><input id="target-rate" data-field="target_rate" type="text" inputmode="decimal" placeholder="20"></div>
+            <details class="secondary-price"><summary>가산 종료 후 약가 입력</summary><div class="field"><label for="post-price">가산 종료 후 예상 약가 <span class="label-unit">원/T</span></label><input id="post-price" data-field="post_price" type="text" inputmode="decimal" placeholder="선택 입력"></div></details>
+          </div>
+          <fieldset class="option-group company-group"><legend>기업별 가산 <span class="selection-note">하나 선택</span></legend>
+            <label class="choice"><input type="radio" name="company-type" value="innovative" data-field="company_type"><span>혁신형 제약기업</span></label>
+            <label class="choice"><input type="radio" name="company-type" value="near" data-field="company_type"><span>준혁신형 /<br>수급안정 선도기업</span></label>
+            <label class="choice"><input type="radio" name="company-type" value="general" data-field="company_type"><span>일반기업</span></label>
+          </fieldset>
+          <fieldset class="option-group"><legend>약제별 가산 <span class="group-subtitle">일반</span></legend>
+            <label class="choice"><input type="checkbox" data-pricing-flag="originator_data"><span>오리지널 / 자료제출의약품</span></label>
+            <label class="choice"><input type="checkbox" data-pricing-flag="improved"><span>개량신약 / 개량신약복합제</span></label>
+            <label class="choice"><input type="checkbox" data-pricing-flag="biologic"><span>생물의약품</span></label>
+          </fieldset>
+          <fieldset class="option-group supply-group"><legend>약제별 가산 <span class="group-subtitle">수급안정</span></legend>
+            <label class="choice"><input type="checkbox" data-pricing-flag="api_self"><span>원료직접생산의약품</span></label>
+            <label class="choice"><input type="checkbox" data-pricing-flag="domestic_essential"><span>국산원료 사용<br>국가필수의약품</span></label>
+            <label class="choice"><input type="checkbox" data-pricing-flag="own_injectable_pediatric"><span>직접 생산 항생주사제 /<br>소아의약품</span></label>
+          </fieldset>
+        </div>
+        <div class="pricing-bottom"><fieldset class="count-group"><legend>동일제제 품목 수</legend><label class="choice compact"><input type="radio" name="identical-count-band" data-field="identical_count_band" value="lt14"><span>14개 미만</span></label><label class="choice compact"><input type="radio" name="identical-count-band" data-field="identical_count_band" value="ge14"><span>14개 이상</span></label></fieldset><p id="pricing-input-note" class="help-text">자동 산정은 공식 규정 확인 후 제공합니다.</p></div>
+        <div id="pricing-extra-fields" class="advanced-pricing" hidden></div>
+      </section>
+
+      <section class="card materials-card" aria-labelledby="materials-heading">
+        <div class="section-heading"><div><h2 id="materials-heading">원료 입력</h2><span class="section-note">실제 투입량 기준 · 비용에 수율 반영</span></div><div class="row-actions"><button type="button" id="add-api" class="button small outline">＋ API 추가</button><button type="button" id="add-excipient" class="button small outline">＋ 부형제 추가</button><button type="button" id="delete-materials" class="button small text-button danger">선택 행 삭제</button></div></div>
+        <div class="table-scroll material-table-scroll"><table class="material-table"><caption class="visually-hidden">원료별 투입량, 구매단가, 배치당 비용 및 1T당 비용</caption><colgroup><col class="col-check"><col class="col-kind"><col class="col-name"><col class="col-supplier"><col class="col-amount"><col class="col-price"><col class="col-price-unit"><col class="col-batch"><col class="col-unit"></colgroup><thead><tr><th class="selection-cell"><input id="select-all-materials" type="checkbox" aria-label="모든 원료 행 선택"></th><th scope="col">구분</th><th scope="col">원료명</th><th scope="col">제조원 · 공급처</th><th scope="col" class="numeric">실제 투입량 <span>mg/T</span></th><th scope="col" class="numeric">구매단가</th><th scope="col">단가 단위</th><th scope="col" class="numeric">1배치당 비용 <span>원</span></th><th scope="col" class="numeric">1T당 비용 <span>원/T</span></th></tr></thead><tbody id="material-body"></tbody></table></div>
+        <div id="materials-empty" class="empty-state" hidden>API 또는 부형제를 추가해 원료비를 계산하세요.</div>
+        <div class="material-totals"><div><span>배치당 API 비용</span><strong id="api-batch">—</strong><small>원</small></div><div><span>배치당 부형제 비용</span><strong id="excipient-batch">—</strong><small>원</small></div><div class="unit-total"><span>1T당 API 비용</span><strong id="api-unit">—</strong><small>원/T</small></div><div class="unit-total"><span>1T당 부형제 비용</span><strong id="excipient-unit">—</strong><small>원/T</small></div></div>
+      </section>
+
+      <section class="card fixed-card" aria-labelledby="fixed-heading">
+        <div class="fixed-intro"><h2 id="fixed-heading">고정 비용</h2><p>배치 전체 비용을 입력하세요.<br>1T당 비용에는 수율을 적용합니다.</p></div>
+        <div class="fixed-cost-item"><div class="field"><label for="batch-packaging">배치 전체 포자재비 <span class="label-unit">원</span></label><input id="batch-packaging" data-field="batch_packaging" type="text" inputmode="decimal" placeholder="배치 전체 비용"></div><div class="fixed-unit"><span>1T당 포자재비</span><strong id="packaging-unit">—</strong><small>원/T</small></div></div>
+        <div class="fixed-cost-item"><div class="field"><label for="batch-labor">배치 전체 공수비 <span class="label-unit">원</span></label><input id="batch-labor" data-field="batch_labor" type="text" inputmode="decimal" placeholder="배치 전체 비용"></div><div class="fixed-unit"><span>1T당 공수비</span><strong id="labor-unit">—</strong><small>원/T</small></div></div>
+      </section>
+      <div id="input-errors" class="validation-summary" role="status" aria-live="polite" hidden></div>
+    </section>
+
+    <section id="tab-results" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-results" hidden>
+      <div class="results-heading"><div><h2>현재 시나리오 계산 결과</h2><p>모든 비용은 제조수율을 반영한 1T 기준입니다.</p></div><span id="result-target-status" class="target-status">계산 대기</span></div>
+      <div class="metric-grid">
+        <article class="metric-card featured"><span class="metric-label">제조원가</span><div><strong id="result-cost">—</strong><span class="metric-unit">원/T</span></div><p id="batch-total-note">원료비 + 포자재비 + 공수비</p></article>
+        <article class="metric-card"><span class="metric-label">보험약가 대비 원가율</span><div><strong id="result-rate">—</strong><span class="metric-unit">%</span></div><p>원가율 100% 초과도 그대로 표시</p></article>
+        <article class="metric-card"><span class="metric-label">계산에 사용한 약가</span><div><strong id="result-price">—</strong><span class="metric-unit">원/T</span></div><p id="pricing-source">사용자 입력값</p></article>
+        <article class="metric-card"><span class="metric-label">목표 원가율과의 차이</span><div><strong id="result-gap">—</strong><span class="metric-unit">%p</span></div><p id="target-rate-note">현재 원가율 − 목표 원가율</p></article>
+        <article class="metric-card"><span class="metric-label">필요 절감액</span><div><strong id="result-savings">—</strong><span class="metric-unit">원/T</span></div><p id="allowed-cost-note">목표 달성 시 0원</p></article>
+      </div>
+      <div class="results-detail-grid">
+        <section class="card composition-card" aria-labelledby="composition-heading"><div class="section-heading"><h2 id="composition-heading">비용 구성</h2><span class="section-note">원/T</span></div><div id="composition-bar" class="composition-bar" role="img" aria-label="비용 구성 비중"></div><table class="composition-table"><caption class="visually-hidden">비용 항목별 금액과 비중</caption><thead><tr><th scope="col">항목</th><th scope="col" class="numeric">금액</th><th scope="col" class="numeric">비중</th></tr></thead><tbody id="composition-body"></tbody></table></section>
+        <section class="card calculation-notes" aria-labelledby="basis-heading"><div class="section-heading"><h2 id="basis-heading">약가 계산 근거</h2><span id="pricing-calculation-badge" class="status-pill warning">규정 미확인</span></div><dl class="basis-list"><div><dt>적용 규정</dt><dd id="pricing-rule">규정 미확인 · 직접 입력</dd></div><div><dt>기준일</dt><dd id="pricing-date">—</dd></div><div><dt>가산 종료 후 원가율</dt><dd id="result-post-rate">입력 없음</dd></div></dl><div id="pricing-steps" class="pricing-steps">우리 제품 예상 약가를 입력하면 제조원가율을 계산합니다.</div><div class="assumptions-note"><span class="note-symbol" aria-hidden="true">i</span><p>실제 투입량으로 계산합니다. 염·수화물 및 역가 보정은 자동 적용하지 않습니다. 보험약가 대비 원가율은 실제 판매이익률과 다릅니다.</p></div></section>
+      </div>
+      <section class="card comparison-card" aria-labelledby="comparison-heading"><div class="section-heading"><div><h2 id="comparison-heading">시나리오 비교</h2><span class="section-note">입력 페이지에서 현재 값을 복제해 다른 조건과 비교하세요.</span></div><span id="scenario-count" class="count-badge">—개 시나리오</span></div><div class="table-scroll"><table class="comparison-table"><caption class="visually-hidden">여러 시나리오의 주요 조건과 제조원가율 비교</caption><thead id="comparison-head"><tr><th scope="col">시나리오</th><th scope="col" class="numeric">배치사이즈<br><span>T</span></th><th scope="col" class="numeric">수율<br><span>%</span></th><th scope="col" class="numeric">환율<br><span>원/USD</span></th><th scope="col" class="numeric">API<br><span>원/T</span></th><th scope="col" class="numeric">부형제<br><span>원/T</span></th><th scope="col" class="numeric">포자재<br><span>원/T</span></th><th scope="col" class="numeric">공수<br><span>원/T</span></th><th scope="col" class="numeric">제조원가<br><span>원/T</span></th><th scope="col" class="numeric">예상 약가<br><span>원/T</span></th><th scope="col" class="numeric">원가율<br><span>%</span></th></tr></thead><tbody id="comparison-body"></tbody></table></div><p class="comparison-footnote">각 시나리오는 독립적으로 저장됩니다. 복제한 값을 수정해도 원본에는 영향을 주지 않습니다.</p></section>
+    </section>
+    <footer class="app-footer"><span id="app-status" role="status" aria-live="polite">파일은 내 컴퓨터에 저장됩니다.</span><span>서버 전송 없이 브라우저에서 계산</span></footer>
+  </main>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

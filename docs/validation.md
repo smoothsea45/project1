@@ -26,3 +26,22 @@ QT_QPA_PLATFORM=offscreen XDG_CACHE_HOME=/tmp/pharma-cost-cache .venv/bin/python
 Windows 배포는 **설정 및 절차 준비** 상태다. 현재 환경에서 Windows `.exe`를 빌드하거나 Python 없는 Windows PC에서 실행하지 않았다. 실제 Windows 빌드 및 오프라인 실행 검증은 [Windows 배포 안내](windows-distribution.md)에 따라 수행해야 한다.
 
 약가 자동 산정률은 구현하거나 검증하지 않았다. 첫 버전의 계산은 사용자 입력 약가만 사용한다.
+
+## 배치 기준 웹 버전 검증
+
+추가 환경: Node.js 24.19.0, 함께 배포한 Decimal.js 10.6.0, Playwright 1.62.0과 시스템 Chromium. Decimal.js 배포 압축파일은 npm 공식 레지스트리의 SHA-512 무결성 값과 일치함을 확인했다. 계산 라이브러리는 실행 중 내려받지 않는다.
+
+```bash
+node --test web/tests/engine.test.cjs
+.venv/bin/python -m pytest web/tests/test_browser.py
+```
+
+- 계산·JSON: **69개 통과**. 배치 기준 네 단가 단위, 공통 환율, 전체 단위 비용 수율 적용, 부분 결과, 복제 원본 유지, 엄격한 파일 검증을 포함한다.
+- 실제 브라우저: **29개 통과**. 즉시 입력, 원료표·다중 행 삭제·TSV 붙여넣기, 시나리오 비교, JSON 다운로드·열기, 미저장 확인, 브라우저 초안 복원, 외부 요청 없음과 루트 진입 페이지 이동을 포함한다.
+- 기존 데스크톱 테스트 113개와 브라우저 테스트 29개를 함께 실행한 결과: **142개 통과**. Node 계산 테스트 69개는 별도 실행했다.
+- 공식 규정 미확인 상태에서는 자동 약가를 만들거나 오리지널·직접 입력값으로 대체하지 않음을 검증했다.
+- 390·1366·1920px 화면에서 페이지 전체 가로 넘침을 확인했다. 큰 화면에는 입력을 모으고 작은 화면에서는 페이지 및 원료 표의 스크롤을 제공한다.
+
+브라우저 테스트는 내부 HTTP 서버에서 수행했다. 이 클라우드의 Chromium 관리 정책은 `file://` 직접 실행을 `ERR_BLOCKED_BY_ADMINISTRATOR`로 차단하므로 이 경로와 실제 Windows 직접 실행은 검증 완료로 주장하지 않는다. 웹 파일은 상대 경로의 일반 HTML·CSS·JavaScript이며 외부 서버·API를 사용하지 않는다.
+
+GitHub Pages 게시와 공개 주소의 실행 검증은 저장소 관리자가 Pages를 활성화한 뒤 수행해야 한다. 공식 약가 원문 조사는 [조사 기록](pricing-reference.md)의 접속 차단을 해결한 후 이어가야 한다.
