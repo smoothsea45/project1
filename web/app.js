@@ -14,6 +14,7 @@
   let currentResult;
   // The comparison preview starts at year 1 independently of the input-page selection.
   const comparisonYears = new Map();
+  let draggingScenarioId = null;
   let toastTimer;
   let storageMessage = '';
   let storageAvailable = true;
@@ -192,21 +193,79 @@
       const selected = s.id === project.active_scenario_id;
       const number = String(index + 1).padStart(2, '0');
       const button = element('button', undefined, 'scenario-tab' + (selected ? ' active' : ''));
+      const handle = element('span', '⠿', 'scenario-drag-handle');
+      handle.setAttribute('aria-hidden', 'true');
       const badge = element('span', number, 'tab-number scenario-number');
       badge.setAttribute('aria-hidden', 'true');
-      button.append(badge, element('span', s.name, 'scenario-name'));
+      button.append(handle, badge, element('span', s.name, 'scenario-name'));
       button.type = 'button'; button.dataset.scenarioId = s.id;
+      button.draggable = project.scenarios.length > 1;
       button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(selected));
       button.setAttribute('aria-label', (index + 1) + '번 시나리오: ' + s.name);
+      button.setAttribute('aria-describedby', 'scenario-reorder-hint');
+      button.setAttribute('aria-keyshortcuts', 'Alt+Shift+ArrowLeft Alt+Shift+ArrowRight');
       button.tabIndex = selected ? 0 : -1;
-      button.title = number + '. ' + s.name;
+      button.title = number + '. ' + s.name + (project.scenarios.length > 1 ? '\n드래그해 순서 변경 · 키보드: Alt+Shift+←/→' : '');
       button.addEventListener('click', () => activateScenario(s.id));
+      button.addEventListener('dragstart', event => {
+        if (project.scenarios.length < 2 || !event.dataTransfer) { event.preventDefault(); return; }
+        clearScenarioDrag();
+        draggingScenarioId = s.id;
+        event.dataTransfer.effectAllowed = 'move';
+        event.dataTransfer.setData('text/plain', s.id);
+        event.dataTransfer.setData('application/x-pharma-cost-scenario', s.id);
+        button.classList.add('dragging');
+        $('scenario-tabs').classList.add('dragging-scenarios');
+      });
+      button.addEventListener('dragend', clearScenarioDrag);
       $('scenario-tabs').append(button);
     }
     $('delete-scenario').disabled = project.scenarios.length < 2;
     $('clone-scenario').disabled = project.scenarios.length >= E.MAX_SCENARIOS;
     $('clone-scenario').title = project.scenarios.length >= E.MAX_SCENARIOS ? '한 프로젝트에는 최대 ' + E.MAX_SCENARIOS + '개 시나리오를 만들 수 있습니다.' : '현재 입력값을 새 시나리오로 복제합니다.';
     $('scenario-count').textContent = project.scenarios.length + '개 시나리오';
+  }
+  function clearScenarioDropMarkers() {
+    $('scenario-tabs').querySelectorAll('.drop-before,.drop-after').forEach(button => button.classList.remove('drop-before', 'drop-after'));
+  }
+  function clearScenarioDrag() {
+    draggingScenarioId = null;
+    clearScenarioDropMarkers();
+    $('scenario-tabs').classList.remove('dragging-scenarios');
+    $('scenario-tabs').querySelectorAll('.dragging').forEach(button => button.classList.remove('dragging'));
+  }
+  function scenarioDropPosition(event) {
+    const from = project.scenarios.findIndex(s => s.id === draggingScenarioId);
+    if (from < 0) return null;
+    const tabs = $('scenario-tabs');
+    let button = event.target.closest('.scenario-tab');
+    if (!button || button.parentElement !== tabs) {
+      // Resolve gaps and the spare end of the tab list, including its two-row layout.
+      let nearest = Infinity;
+      for (const candidate of tabs.children) {
+        const box = candidate.getBoundingClientRect();
+        const dx = Math.max(box.left - event.clientX, 0, event.clientX - box.right);
+        const dy = Math.max(box.top - event.clientY, 0, event.clientY - box.bottom);
+        const distance = dx * dx + dy * dy;
+        if (distance < nearest) { nearest = distance; button = candidate; }
+      }
+    }
+    if (!button) return null;
+    const box = button.getBoundingClientRect();
+    const after = event.clientX >= box.left + box.width / 2;
+    let index = project.scenarios.findIndex(s => s.id === button.dataset.scenarioId) + Number(after);
+    if (index > from) index -= 1;
+    return {button, after, index};
+  }
+  function moveScenario(id, index) {
+    const from = project.scenarios.findIndex(s => s.id === id);
+    const to = Math.max(0, Math.min(project.scenarios.length - 1, index));
+    if (from < 0 || from === to) return;
+    const [moved] = project.scenarios.splice(from, 1);
+    project.scenarios.splice(to, 0, moved);
+    renderScenarioTabs(); changed();
+    [...$('scenario-tabs').children].find(button => button.dataset.scenarioId === project.active_scenario_id).focus({preventScroll: true});
+    showToast(moved.name + ' 시나리오를 ' + (to + 1) + '번째로 옮겼습니다.');
   }
   function activateScenario(id) {
     if (id === project.active_scenario_id || !project.scenarios.some(s => s.id === id)) return;
@@ -791,6 +850,25 @@
     });
   }
   document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => selectTab(button.dataset.tab)));
+  $('scenario-tabs').addEventListener('dragover', event => {
+    const position = scenarioDropPosition(event);
+    if (!position) return;
+    event.preventDefault();
+    if (event.dataTransfer) event.dataTransfer.dropEffect = 'move';
+    clearScenarioDropMarkers();
+    if (project.scenarios[position.index].id !== draggingScenarioId) position.button.classList.add(position.after ? 'drop-after' : 'drop-before');
+  });
+  $('scenario-tabs').addEventListener('dragleave', event => {
+    if (!event.relatedTarget || !$('scenario-tabs').contains(event.relatedTarget)) clearScenarioDropMarkers();
+  });
+  $('scenario-tabs').addEventListener('drop', event => {
+    const position = scenarioDropPosition(event);
+    if (!position) return;
+    event.preventDefault();
+    const id = draggingScenarioId;
+    clearScenarioDrag();
+    moveScenario(id, position.index);
+  });
   document.querySelectorAll('[data-product-field]').forEach(input => input.addEventListener('input', () => { project.product[input.dataset.productField] = input.value; changed(); }));
   document.querySelectorAll('[data-field]').forEach(input => {
     if (input.inputMode === 'decimal') {
@@ -896,10 +974,15 @@
     if (replacement) replacement.focus();
   });
   document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') clearScenarioDrag();
     if (event.target.matches('#scenario-tabs [role="tab"]') && ['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
       event.preventDefault();
       const buttons = [...$('scenario-tabs').children];
       const current = buttons.indexOf(event.target);
+      if (event.altKey && event.shiftKey && ['ArrowLeft', 'ArrowRight'].includes(event.key)) {
+        moveScenario(event.target.dataset.scenarioId, current + (event.key === 'ArrowRight' ? 1 : -1));
+        return;
+      }
       const index = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (current + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
       activateScenario(buttons[index].dataset.scenarioId);
       [...$('scenario-tabs').children][index].focus();

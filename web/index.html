@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=16">
+  <link rel="stylesheet" href="styles.css?v=17">
   <script defer src="vendor/decimal.js"></script>
   <script defer src="pricing.js?v=3"></script>
   <script defer src="engine.js?v=9"></script>
-  <script defer src="app.js?v=16"></script>
+  <script defer src="app.js?v=17"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -30,7 +30,7 @@
   <main class="workspace">
     <div id="example-banner" class="example-banner" hidden><span class="example-tag">가상 예제</span><span>사용법을 살펴보는 예제입니다. 실제 견적이나 보험약가가 아닙니다.</span></div>
     <div class="scenario-toolbar">
-      <div class="scenario-picker"><span class="scenario-label">현재 시나리오</span><nav id="scenario-tabs" role="tablist" aria-label="시나리오 선택"></nav></div>
+      <div class="scenario-picker"><span class="scenario-label" title="탭을 드래그해 순서를 바꿀 수 있습니다. 키보드: Alt+Shift+←/→">현재 시나리오</span><nav id="scenario-tabs" role="tablist" aria-label="시나리오 선택" title="탭을 드래그해 순서를 바꿀 수 있습니다. 키보드: Alt+Shift+←/→"></nav><span id="scenario-reorder-hint" class="visually-hidden">탭을 드래그해 순서를 바꿀 수 있습니다. 키보드: Alt+Shift+←/→</span></div>
       <div class="scenario-actions"><button type="button" id="clone-scenario" class="button outline"><span aria-hidden="true">＋</span>현재 입력 복제</button><button type="button" id="rename-scenario" class="button text-button">이름 변경</button><button type="button" id="delete-scenario" class="button text-button danger">삭제</button></div>
       <span id="project-status" class="save-state" role="status">새 프로젝트</span>
     </div>

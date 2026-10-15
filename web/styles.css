@@ -184,6 +184,17 @@
 #scenario-tabs .scenario-number{flex-shrink:0;min-width:23px;padding:2px 5px;border-radius:4px;background:#8061b115;color:#76628f;font-size:10px;font-weight:700;line-height:1.5;text-align:center;font-variant-numeric:tabular-nums;opacity:1}
 #scenario-tabs button[aria-selected="true"] .scenario-number{background:#8061b12b;color:#55347e}
 #scenario-tabs .scenario-name{min-width:0;text-align:left;overflow-wrap:anywhere}
+#scenario-tabs .scenario-tab{position:relative}
+#scenario-tabs .scenario-tab[draggable="true"]{cursor:grab}
+#scenario-tabs .scenario-tab[draggable="false"] .scenario-drag-handle{display:none}
+#scenario-tabs .scenario-drag-handle{flex:0 0 9px;align-self:center;color:#9c88b3;font-size:16px;font-weight:400;line-height:1;letter-spacing:-1px;opacity:.7;user-select:none;pointer-events:none}
+#scenario-tabs .scenario-tab[aria-selected="true"] .scenario-drag-handle{color:#8061b1;opacity:.9}
+#scenario-tabs .scenario-tab:hover .scenario-drag-handle{opacity:1}
+#scenario-tabs .scenario-tab.dragging{opacity:.4;cursor:grabbing}
+#scenario-tabs.dragging-scenarios .scenario-tab{cursor:grabbing}
+#scenario-tabs .scenario-tab.drop-before::before,#scenario-tabs .scenario-tab.drop-after::after{content:"";position:absolute;top:5px;bottom:5px;width:3px;border-radius:2px;background:#8061b1;box-shadow:0 0 0 1px #ffffffb3;pointer-events:none}
+#scenario-tabs .scenario-tab.drop-before::before{left:-5px}
+#scenario-tabs .scenario-tab.drop-after::after{right:-5px}
 .page-tabs .tab{min-width:140px;min-height:52px;padding:14px 26px;font-size:15px}
 @media(max-width:1180px){
   .scenario-toolbar{flex-wrap:wrap;gap:8px 12px;padding:10px 0}
