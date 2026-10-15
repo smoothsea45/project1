@@ -418,7 +418,7 @@
     $('comparison-head').replaceChildren(); $('comparison-body').replaceChildren();
     $('comparison-body').closest('table').style.width = (166 + project.scenarios.length * 340) + 'px';
     const header = element('tr');
-    const itemHeader = element('th', '비교 항목', 'row-label');
+    const itemHeader = element('th', '시나리오명', 'row-label');
     itemHeader.scope = 'col'; header.append(itemHeader);
     const unitHeader = element('tr', undefined, 'comparison-unit-header');
     unitHeader.dataset.comparisonField = 'cost_basis';
@@ -446,7 +446,6 @@
       return list;
     };
     const rows = [
-      ['name', '시나리오명', s => s.name],
       ['batch_size', '배치사이즈 (T)', s => format(s.batch_size, 0, '미입력')],
       ['yield_percent', '수율 (%)', s => format(s.yield_percent, 1, '미입력') + (s.yield_percent === null || s.yield_percent === '' ? '' : '%')],
       ['packaging_form', '포장형태', s => s.packaging_form || '미입력'],

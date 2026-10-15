@@ -21,7 +21,7 @@ from web.tests.test_browser import (
 
 
 COMPARISON_FIELDS = [
-    "name", "batch_size", "yield_percent", "packaging_form", "api_supplier",
+    "batch_size", "yield_percent", "packaging_form", "api_supplier",
     "api_price", "price", "total_cost", "cost_rate", "composition", "cost_basis", "api_cost",
     "excipient_cost", "packaging_cost", "labor_cost",
 ]
@@ -162,7 +162,8 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
     assert page.locator("#comparison-body tr").evaluate_all(
         "rows => rows.map(row => row.dataset.comparisonField)"
     ) == COMPARISON_FIELDS
-    expect(comparison_row(page, "name").locator("td").nth(1)).to_have_text("절감 비교안")
+    expect(page.locator("#comparison-head th").first).to_have_text("시나리오명")
+    expect(page.locator("#comparison-head th").nth(2)).to_have_text("절감 비교안")
     expect(comparison_row(page, "batch_size").locator("td").nth(0)).to_have_text("100,000")
     expect(comparison_row(page, "yield_percent").locator("td").nth(1)).to_have_text("80.0%")
     expect(comparison_row(page, "api_supplier").locator("td").nth(1)).to_contain_text("대체 제조원")

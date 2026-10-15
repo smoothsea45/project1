@@ -213,7 +213,7 @@ def test_comparison_has_two_cost_columns_per_scenario_with_actual_independent_va
         expect(cost_cell(page, "packaging_cost", scenario_id, "unit")).to_have_text("10.00")
     for field in ["api_cost", "excipient_cost", "packaging_cost", "labor_cost"]:
         expect(comparison_row(page, field).locator("td")).to_have_count(8)
-    for field in ["name", "packaging_form", "price", "total_cost", "composition"]:
+    for field in ["packaging_form", "price", "total_cost", "composition"]:
         cells = comparison_row(page, field).locator("td")
         expect(cells).to_have_count(4)
         for cell in cells.all():
