@@ -161,13 +161,14 @@
   }
   function renderScenarioTabs() {
     $('scenario-tabs').replaceChildren();
-    for (const s of project.scenarios) {
+    for (const [index, s] of project.scenarios.entries()) {
       const selected = s.id === project.active_scenario_id;
-      const button = element('button', s.name, 'scenario-tab' + (selected ? ' active' : ''));
+      const label = (index + 1) + '. ' + s.name;
+      const button = element('button', label, 'scenario-tab' + (selected ? ' active' : ''));
       button.type = 'button'; button.dataset.scenarioId = s.id;
       button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(selected));
       button.tabIndex = selected ? 0 : -1;
-      button.title = s.name;
+      button.title = label;
       button.addEventListener('click', () => activateScenario(s.id));
       $('scenario-tabs').append(button);
     }
