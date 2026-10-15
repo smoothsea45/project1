@@ -141,7 +141,7 @@ def test_ten_vertical_bars_show_anniversary_periods_and_selected_price_drives_co
     price_row = page.locator('#comparison-body tr[data-compare-field="price"]')
     if not price_row.count():
         price_row = page.locator('#comparison-body tr').filter(has=page.get_by_role('rowheader', name='우리 제품 약가 (원/T)', exact=True))
-    expect(price_row.locator('td').first).to_have_text('600.00')
+    expect(price_row.locator('td').first).to_have_text('600.0')
 
 
 def test_conditions_recalculate_immediately_and_incomplete_inputs_remove_old_forecast(page):
@@ -371,8 +371,8 @@ def test_comparison_year_previews_start_at_one_and_update_only_their_own_scenari
     before = project(page)
     assert [item['pricing_conditions']['selected_year'] for item in before['scenarios']] == [5, 5]
     comparison(page)
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('600.00')
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.00')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('600.0')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.0')
     expect(comparison_cell(page, 'cost_rate', first_id)).to_have_text('8.3%')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('5.0%')
     for scenario_id, cost in [(first_id, '50'), (second_id, '60')]:
@@ -388,18 +388,20 @@ def test_comparison_year_previews_start_at_one_and_update_only_their_own_scenari
     comparison_year(page, first_id, 5).click()
     expect(comparison_cell(page, 'composition', first_id).locator('.comparison-donut-year')).to_have_text('5년차')
     expect(comparison_cell(page, 'composition', second_id).locator('.comparison-donut-year')).to_have_text('1년차')
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.00')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.0')
     expect(comparison_cell(page, 'cost_rate', first_id)).to_have_text('13.1%')
+    expect(comparison_year(page, first_id, 5).locator('.comparison-year-rate')).to_have_text('13.1%')
     expect(comparison_cell(page, 'composition', first_id).locator('[data-chart-part="rate"]')).to_have_text('13.1%')
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.00')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.0')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('5.0%')
     comparison_year(page, second_id, 6).click()
     expect(comparison_cell(page, 'composition', first_id).locator('.comparison-donut-year')).to_have_text('5년차')
     expect(comparison_cell(page, 'composition', second_id).locator('.comparison-donut-year')).to_have_text('6년차')
     assert page.locator('.comparison-price-chart').evaluate_all('nodes => nodes.map(node => node.dataset.scaleMaximum)') == scales
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('765.00')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('765.0')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('7.8%')
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.00')
+    expect(comparison_year(page, second_id, 6).locator('.comparison-year-rate')).to_have_text('7.8%')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.0')
     expect(comparison_year(page, first_id, 5)).to_have_attribute('aria-pressed', 'true')
     assert project(page) == before
     assert save_file(page, tmp_path / 'comparison-preview.json') == before
@@ -427,17 +429,45 @@ def test_manual_comparison_forecast_has_ten_flat_prices_and_visible_cost_referen
     cost_bars = chart.locator('.comparison-cost-fill')
     expect(cost_bars).to_have_count(10)
     assert cost_bars.evaluate_all('nodes => nodes.map(node => node.dataset.cost)') == ['50'] * 10
+    actual_price = int(manual_price)
+    base_cost = min(50, actual_price)
+    remainder = max(0, actual_price - 50)
+    excess = max(0, 50 - actual_price)
+    expected_rate = '계산불가' if actual_price == 0 else '200.0%' if actual_price == 25 else '16.7%'
     for button in bars.all():
+        stack = button.locator('.comparison-price-stack')
+        cost_fill = button.locator('.comparison-cost-fill')
+        price_fill = button.locator('.comparison-price-fill')
+        excess_fill = button.locator('.comparison-excess-fill')
+        expect(cost_fill).to_have_attribute('data-segment-amount', str(base_cost))
+        expect(price_fill).to_have_attribute('data-remainder', str(remainder))
+        if excess:
+            expect(excess_fill).to_have_attribute('data-excess', str(excess))
+        else:
+            expect(excess_fill).to_have_count(0)
+        expect(stack).to_have_attribute('data-total', str(max(actual_price, 50)))
+        expect(button.locator('.comparison-year-rate')).to_have_text(expected_rate)
+        expected_order = (['comparison-excess-fill'] if excess else []) + ['comparison-price-fill', 'comparison-cost-fill']
+        assert stack.locator(':scope > span').evaluate_all('nodes => nodes.map(node => node.className)') == expected_order
+        stack_box = stack.bounding_box()
         column = button.locator('.comparison-price-column').bounding_box()
-        price_bar = button.locator('.comparison-price-fill').bounding_box()
-        cost_bar = button.locator('.comparison-cost-fill').bounding_box()
-        assert cost_bar['width'] < price_bar['width']
-        assert abs((cost_bar['x'] + cost_bar['width'] / 2) - (price_bar['x'] + price_bar['width'] / 2)) <= 1
-        assert abs((cost_bar['y'] + cost_bar['height']) - (price_bar['y'] + price_bar['height'])) <= 1
-        assert column['y'] <= cost_bar['y']
-        assert cost_bar['y'] + cost_bar['height'] <= column['y'] + column['height'] + 1
+        fills = ([excess_fill] if excess else []) + [price_fill, cost_fill]
+        boxes = [fill.bounding_box() for fill in fills]
+        assert sum(box['height'] for box in boxes) == pytest.approx(stack_box['height'], abs=1)
+        for above, below in zip(boxes, boxes[1:]):
+            assert above['y'] + above['height'] == pytest.approx(below['y'], abs=1)
+        for box in boxes:
+            assert box['width'] == pytest.approx(stack_box['width'], abs=1)
+            assert box['x'] == pytest.approx(stack_box['x'], abs=1)
+        assert column['y'] <= stack_box['y']
+        assert stack_box['y'] + stack_box['height'] <= column['y'] + column['height'] + 1
+        assert stack_box['height'] * base_cost / max(actual_price, 50) == pytest.approx(boxes[-1]['height'], abs=1)
+        colors = [fill.evaluate('node => getComputedStyle(node).backgroundColor') for fill in fills]
+        assert len(set(colors)) == len(fills)
+        label_box = button.locator('.comparison-year-rate').bounding_box()
+        assert label_box['y'] + label_box['height'] <= stack_box['y'] + 1
     comparison_year(page, current['id'], 7).click()
-    expect(comparison_cell(page, 'price', current['id'])).to_have_text(f'{int(manual_price):,.2f}')
+    expect(comparison_cell(page, 'price', current['id'])).to_have_text(f'{int(manual_price):,.1f}')
     expect(comparison_cell(page, 'cost_rate', current['id'])).to_have_text('계산 불가' if manual_price == '0' else '200.0%' if manual_price == '25' else '16.7%')
     assert scenario(page) == current
     assert 'NaN' not in chart.inner_text()
@@ -454,7 +484,7 @@ def test_comparison_incomplete_automatic_forecast_shows_guidance_and_no_false_ze
     expect(chart.locator('[data-comparison-year]')).to_have_count(0)
     expect(chart).to_contain_text('입력')
     expect(comparison_cell(page, 'price', current['id'])).to_have_text('계산 불가')
-    expect(comparison_cell(page, 'total_cost', current['id'])).to_have_text('50.00')
+    expect(comparison_cell(page, 'total_cost', current['id'])).to_have_text('50.0')
     expect(comparison_cell(page, 'cost_rate', current['id'])).to_have_text('계산 불가')
     assert 'NaN' not in chart.inner_text()
     assert 'Infinity' not in chart.inner_text()
@@ -474,29 +504,38 @@ def test_comparison_shared_axis_matches_equal_prices_and_rescales_all_scenarios_
     comparison(page)
     first_chart = comparison_chart(page, first_id)
     second_chart = comparison_chart(page, second_id)
-    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '2233'
-    first_383 = comparison_year(page, first_id, 5).locator('.comparison-price-fill')
-    second_383 = comparison_year(page, second_id, 1).locator('.comparison-price-fill')
-    assert first_383.bounding_box()['height'] == pytest.approx(second_383.bounding_box()['height'], abs=1)
-    old_height = first_383.bounding_box()['height']
+    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '2537.5'
+    first_383 = comparison_year(page, first_id, 5)
+    second_383 = comparison_year(page, second_id, 1)
+
+    def price_height(button):
+        return sum(button.locator(selector).bounding_box()['height'] for selector in ['.comparison-cost-fill', '.comparison-price-fill'])
+
+    assert price_height(first_383) == pytest.approx(price_height(second_383), abs=1)
+    old_height = price_height(first_383)
     cost_bars = second_chart.locator('.comparison-cost-fill')
     assert cost_bars.evaluate_all('nodes => nodes.map(node => node.dataset.cost)') == ['2030'] * 10
-    for cost_bar in cost_bars.all():
-        bar_box = cost_bar.bounding_box()
-        column = cost_bar.locator('..').bounding_box()
-        assert column['y'] <= bar_box['y']
-        assert bar_box['height'] > second_383.bounding_box()['height']
-        assert bar_box['y'] + bar_box['height'] <= column['y'] + column['height'] + 1
+    assert cost_bars.evaluate_all('nodes => nodes.map(node => node.dataset.segmentAmount)') == ['383'] * 10
+    excess_bars = second_chart.locator('.comparison-excess-fill')
+    assert excess_bars.evaluate_all('nodes => nodes.map(node => node.dataset.excess)') == ['1647'] * 10
+    for stack in second_chart.locator('.comparison-price-stack').all():
+        stack_box = stack.bounding_box()
+        column = stack.locator('..').bounding_box()
+        assert column['y'] <= stack_box['y']
+        assert stack_box['height'] > price_height(second_383)
+        assert stack_box['y'] + stack_box['height'] <= column['y'] + column['height'] + 1
     # Editing one scenario's cost recomputes the common axis and every chart's bars.
     page.locator('#tab-button-input').click()
     page.locator('#batch-labor').fill('3000000')
     comparison(page)
-    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '660'
-    assert first_383.bounding_box()['height'] > old_height * 3
-    assert first_383.bounding_box()['height'] == pytest.approx(second_383.bounding_box()['height'], abs=1)
+    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '750'
+    assert price_height(first_383) > old_height * 3
+    assert price_height(first_383) == pytest.approx(price_height(second_383), abs=1)
     assert second_chart.locator('.comparison-cost-fill').evaluate_all('nodes => nodes.map(node => node.dataset.cost)') == ['60'] * 10
+    assert second_chart.locator('.comparison-cost-fill').evaluate_all('nodes => nodes.map(node => node.dataset.segmentAmount)') == ['60'] * 10
+    assert second_chart.locator('.comparison-price-fill').evaluate_all('nodes => nodes.map(node => node.dataset.remainder)') == ['323'] * 10
     comparison_year(page, first_id, 8).click()
-    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '660'
+    assert first_chart.get_attribute('data-scale-maximum') == second_chart.get_attribute('data-scale-maximum') == '750'
 
 
 @pytest.mark.parametrize('cost_state', ['zero', 'missing'])
@@ -519,12 +558,30 @@ def test_comparison_cost_bars_handle_zero_and_missing_totals_without_fake_values
         assert cost_bars.evaluate_all('nodes => nodes.map(node => node.dataset.cost)') == ['0'] * 10
         assert cost_bars.evaluate_all('nodes => nodes.every(node => parseFloat(node.style.height) === 0)')
         assert chart.get_attribute('data-scale-maximum') == '1'
-        expect(comparison_cell(page, 'total_cost', current_id)).to_have_text('0.00')
+        expect(comparison_cell(page, 'total_cost', current_id)).to_have_text('0.0')
     else:
         expect(cost_bars).to_have_count(0)
-        assert chart.get_attribute('data-scale-maximum') == '330'
+        expect(chart.locator('.comparison-excess-fill')).to_have_count(0)
+        expect(chart.locator('.comparison-unresolved-fill')).to_have_count(10)
+        assert chart.get_attribute('data-scale-maximum') == '375'
         expect(chart).to_contain_text('미완성')
         expect(comparison_cell(page, 'total_cost', current_id)).to_have_text('미완성')
     assert 'NaN' not in chart.inner_text()
     assert 'Infinity' not in chart.inner_text()
     assert chart.locator('[style*="NaN"], [style*="Infinity"]').count() == 0
+
+
+def test_comparison_small_price_keeps_actual_rate_and_uses_compact_graph_label(page):
+    setup_base(page)
+    add_material(page)
+    page.locator('#manual-price').fill('1')
+    current_id = scenario(page)['id']
+    comparison(page)
+    button = comparison_year(page, current_id, 1)
+    label = button.locator('.comparison-year-rate')
+    expect(label).to_have_text('5.0e3%')
+    expect(comparison_cell(page, 'cost_rate', current_id)).to_have_text('5,000.0%')
+    assert '5000.0%' in (label.get_attribute('title') or button.get_attribute('title') or '').replace(',', '')
+    expect(button.locator('.comparison-cost-fill')).to_have_attribute('data-segment-amount', '1')
+    expect(button.locator('.comparison-excess-fill')).to_have_attribute('data-excess', '49')
+    assert comparison_chart(page, current_id).get_attribute('data-scale-maximum') == '62.5'

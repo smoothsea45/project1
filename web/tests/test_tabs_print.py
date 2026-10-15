@@ -207,10 +207,10 @@ def test_comparison_has_two_cost_columns_per_scenario_with_actual_independent_va
     assert composition_box["y"] + composition_box["height"] <= header_box["y"] + 1
     assert header_box["y"] + header_box["height"] <= api_box["y"] + 1
     for index, scenario_id in enumerate(ids):
-        expect(cost_cell(page, "api_cost", scenario_id, "batch")).to_have_text(f"{2000000 * (index + 1):,.2f}")
-        expect(cost_cell(page, "api_cost", scenario_id, "unit")).to_have_text(f"{20 * (index + 1):.2f}")
-        expect(cost_cell(page, "packaging_cost", scenario_id, "batch")).to_have_text("1,000,000.00")
-        expect(cost_cell(page, "packaging_cost", scenario_id, "unit")).to_have_text("10.00")
+        expect(cost_cell(page, "api_cost", scenario_id, "batch")).to_have_text(f"{2000000 * (index + 1):,}")
+        expect(cost_cell(page, "api_cost", scenario_id, "unit")).to_have_text(f"{20 * (index + 1):.1f}")
+        expect(cost_cell(page, "packaging_cost", scenario_id, "batch")).to_have_text("1,000,000")
+        expect(cost_cell(page, "packaging_cost", scenario_id, "unit")).to_have_text("10.0")
     for field in ["api_cost", "excipient_cost", "packaging_cost", "labor_cost"]:
         expect(comparison_row(page, field).locator("td")).to_have_count(8)
     for field in ["packaging_form", "price", "total_cost", "composition"]:
@@ -263,7 +263,7 @@ def test_four_scenarios_and_long_api_names_print_on_one_a4_page_without_clipping
     text = " ".join(word.text or "" for word in root.findall(".//x:word", namespace))
     for name in ["PTP 비교안", "병 포장 비교안", "최종 검토안"]:
         assert name in text
-    for expected in ["API", "부형제", "포자재비", "공수비", "배치당", "1T당", "55.00", "75.00", "95.00", "115.00", "8,500,000.00", "보노프라잔 푸마레이트", "아목시실린 수화물", "제조원 A", "제조원 B"]:
+    for expected in ["API", "부형제", "포자재비", "공수비", "배치당", "1T당", "55.0", "75.0", "95.0", "115.0", "8,500,000", "보노프라잔 푸마레이트", "아목시실린 수화물", "제조원 A", "제조원 B", "원/kg", "달러/kg"]:
         assert expected in text
     assert "처방부터 배치 원가까지" not in text
     for pdf_page in pages:

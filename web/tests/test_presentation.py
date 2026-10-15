@@ -61,7 +61,7 @@ def test_money_and_percent_precision_are_display_only(page):
     expect(page.locator("#donut-rate")).to_have_text("16.7%")
     expect(page.locator("#donut-total")).to_have_text("50.13 원/T")
     comparison(page)
-    expect(comparison_row(page, "api_price").locator("td")).to_contain_text("1,000,000.00 원/kg")
+    expect(comparison_row(page, "api_price").locator("td")).to_contain_text("1,000,000 원/kg")
     expect(comparison_row(page, "yield_percent").locator("td")).to_have_text("100.0%")
     expect(comparison_row(page, "cost_rate").locator("td")).to_have_text("16.7%")
     data = scenario(page)
@@ -167,17 +167,17 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
     expect(comparison_row(page, "batch_size").locator("td").nth(0)).to_have_text("100,000")
     expect(comparison_row(page, "yield_percent").locator("td").nth(1)).to_have_text("80.0%")
     expect(comparison_row(page, "api_supplier").locator("td").nth(1)).to_contain_text("대체 제조원")
-    expect(comparison_row(page, "api_price").locator("td").nth(1)).to_contain_text("400,000.00 원/kg")
-    expect(comparison_row(page, "price").locator("td").nth(1)).to_have_text("300.00")
+    expect(comparison_row(page, "api_price").locator("td").nth(1)).to_contain_text("400,000 원/kg")
+    expect(comparison_row(page, "price").locator("td").nth(1)).to_have_text("300.0")
     for field, expected in [
-        ("total_cost", "47.50"), ("cost_rate", "15.8%"),
+        ("total_cost", "47.5"), ("cost_rate", "15.8%"),
     ]:
         expect(comparison_row(page, field).locator("td").nth(1)).to_have_text(expected)
     for field, batch, unit in [
-        ("api_cost", "800,000.00", "10.00"),
-        ("excipient_cost", "0.00", "0.00"),
-        ("packaging_cost", "1,000,000.00", "12.50"),
-        ("labor_cost", "2,000,000.00", "25.00"),
+        ("api_cost", "800,000", "10.0"),
+        ("excipient_cost", "0", "0.0"),
+        ("packaging_cost", "1,000,000", "12.5"),
+        ("labor_cost", "2,000,000", "25.0"),
     ]:
         expect(cost_cell(page, field, clone_id, "batch")).to_have_text(batch)
         expect(cost_cell(page, field, clone_id, "unit")).to_have_text(unit)
@@ -207,7 +207,7 @@ def test_comparison_charts_recalculate_independently_without_changing_original(p
     clone_graph = comparison_chart(page, clone_id)
     expect(original_graph.locator('[data-chart-part="rate"]')).to_have_text("16.7%")
     expect(clone_graph.locator('[data-chart-part="rate"]')).to_have_text("40.0%")
-    for graph, share, amount in [(original_graph, 40, "20.00 원/T"), (clone_graph, 25, "10.00 원/T")]:
+    for graph, share, amount in [(original_graph, 40, "20.0 원/T"), (clone_graph, 25, "10.0 원/T")]:
         segment = graph.locator('[data-chart-part="stack"] [data-item="api"]')
         assert float(segment.get_attribute("data-share")) == pytest.approx(share)
         expect(graph.locator('.composition-row[data-item="api"] .composition-amount')).to_have_text(amount)
@@ -217,8 +217,8 @@ def test_comparison_charts_recalculate_independently_without_changing_original(p
     expect(page.locator("#donut-total")).to_have_text("50.00 원/T")
     expect(page.locator("#donut-rate")).to_have_text("50.0%")
     comparison(page)
-    expect(clone_graph.locator(".donut-total")).to_have_text("50.00 원/T")
-    expect(original_graph.locator(".donut-total")).to_have_text("50.00 원/T")
+    expect(clone_graph.locator(".donut-total")).to_have_text("50.0 원/T")
+    expect(original_graph.locator(".donut-total")).to_have_text("50.0 원/T")
     assert project(page)["scenarios"][0] == original
 
 
@@ -236,16 +236,18 @@ def test_combination_api_suppliers_and_price_units_remain_readable_in_comparison
     prices = comparison_row(page, "api_price").locator("td")
     expect(suppliers).to_contain_text("제조원 A")
     expect(suppliers).to_contain_text("제조원 B · 수입")
-    expect(prices).to_contain_text("1,000,000.00 원/kg")
-    expect(prices).to_contain_text("1.23 달러/g")
-    expect(cost_cell(page, "api_cost", scenario(page)["id"], "unit")).to_have_text("37.28")
-    expect(comparison_row(page, "total_cost").locator("td")).to_have_text("67.28")
+    expect(prices).to_contain_text("1,000,000 원/kg")
+    expect(prices).to_contain_text("1,728,300 원/kg")
+    expect(prices).to_contain_text("714 달러/kg")
+    expect(prices).to_contain_text("1,235 달러/kg")
+    expect(cost_cell(page, "api_cost", scenario(page)["id"], "unit")).to_have_text("37.3")
+    expect(comparison_row(page, "total_cost").locator("td")).to_have_text("67.3")
     for cell in [suppliers, prices]:
         entries = cell.locator(".comparison-api-list > div")
         expect(entries).to_have_count(2)
         for entry in entries.all():
-            name = entry.locator("span").nth(0).bounding_box()
-            value = entry.locator("span").nth(1).bounding_box()
+            name = entry.locator(".comparison-api-name").bounding_box()
+            value = entry.locator(":scope > span").nth(1).bounding_box()
             assert name["x"] + name["width"] <= value["x"] + 1
             for span in entry.locator("span").all():
                 assert span.evaluate("node => node.scrollWidth <= node.clientWidth + 1")
@@ -273,7 +275,7 @@ def test_comparison_chart_handles_unavailable_values_like_result_chart(page, cas
     comparison(page)
     chart = comparison_chart(page, active_id)
     expect(chart.locator('[data-chart-part="rate"]')).to_have_text(expected_rate)
-    expect(chart.locator(".donut-total")).to_have_text(expected_cost)
+    expect(chart.locator(".donut-total")).to_have_text(expected_cost.replace(".00 원/T", ".0 원/T"))
     assert not re.search(r"NaN|Infinity|undefined", chart.inner_text())
     if case == "zero_cost":
         expect(chart.locator('[data-chart-part="stack"] [data-item]')).to_have_count(0)

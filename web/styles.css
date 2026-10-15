@@ -275,7 +275,7 @@
 .pricing-simple-note{margin-top:10px;padding:7px 9px;border-radius:5px;background:#eaf5f3;color:var(--teal-dark);font-size:10px;line-height:1.6}
 .pricing-card .pricing-condition-details .help-text{margin-top:0}
 
-/* 비교표의 약가와 제조원가는 같은 세로축의 겹친 막대로 보여줍니다. */
+/* 비교표의 약가·제조원가·초과분은 공통 축의 누적 막대로 보여줍니다. */
 .comparison-composition .donut-column{position:relative}
 .comparison-donut-year{position:absolute;top:0;left:0;z-index:1;display:inline-flex;align-items:center;padding:3px 7px;border:1px solid #d5e2e7;border-radius:5px;background:#f2f7f9;color:var(--ink-soft);font-size:10px;line-height:1.4;font-weight:600;white-space:nowrap}
 .comparison-table td:has(.comparison-price-chart){padding:10px 12px;vertical-align:top;white-space:normal;text-align:left}
@@ -289,17 +289,27 @@
 .comparison-price-year[aria-pressed=true],.comparison-price-year.selected{background:#118b8714;box-shadow:inset 0 0 0 1px #118b8770}
 .comparison-price-year:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
 .comparison-price-column{position:relative;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-width:0}
-.comparison-price-fill{display:block;width:min(19px,100%);min-height:0;background:#7f94b7;border-radius:3px 3px 0 0}
-.comparison-cost-fill{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:block;width:min(8px,50%);min-height:0;z-index:1;background:#bd7952;border-radius:2px 2px 0 0;pointer-events:none}
+.comparison-price-stack{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;width:min(19px,100%);min-height:0;border-radius:3px 3px 0 0;overflow:hidden}
+.comparison-price-fill,.comparison-cost-fill,.comparison-excess-fill,.comparison-unresolved-fill{position:static;display:block;flex:0 0 auto;width:100%;min-height:0;border-radius:0;pointer-events:none}
+.comparison-price-fill{background:#7f94b7}
+.comparison-cost-fill{background:#bd7952}
+.comparison-excess-fill{background:#be625d}
+.comparison-unresolved-fill{background:#c4ced3}
+.comparison-year-rate{position:absolute;left:50%;bottom:calc(var(--stack-height) + 3px);transform:translateX(-50%);z-index:2;color:var(--ink-soft);font-size:8px;line-height:10px;letter-spacing:-.2px;white-space:nowrap;pointer-events:none}
+.comparison-year-rate.unavailable{font-size:7px;letter-spacing:-.3px}
 .comparison-price-year.bonus .comparison-price-fill{background:var(--teal)}
 .comparison-price-year.extension .comparison-price-fill{background:#66afa5}
 .comparison-price-label{position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);font-size:9px;line-height:14px;white-space:nowrap}
 .comparison-price-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px 9px;margin-top:4px;font-size:10px;line-height:1.5;color:var(--ink-soft);overflow-wrap:anywhere}
-.comparison-price-key,.comparison-cost-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.comparison-price-key::before,.comparison-cost-key::before{content:"";display:block;width:7px;height:9px;border-radius:2px 2px 0 0;background:#7f94b7;flex-shrink:0}
+.comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.comparison-price-key::before,.comparison-cost-key::before,.comparison-excess-key::before,.comparison-unknown-key::before{content:"";display:block;width:7px;height:9px;border-radius:2px 2px 0 0;background:#7f94b7;flex-shrink:0}
 .comparison-price-key.bonus::before{background:var(--teal)}
 .comparison-price-key.extension::before{background:#66afa5}
-.comparison-cost-key::before{width:5px;background:#bd7952}
+.comparison-cost-key::before{background:#bd7952}
+.comparison-excess-key::before{background:#be625d}
+.comparison-unknown-key::before{background:#c4ced3}
+.comparison-api-prices{display:flex;flex-direction:column;align-items:flex-start;gap:2px;min-width:0;font-variant-numeric:tabular-nums;line-height:1.4}
+.comparison-api-prices>span{display:block;max-width:100%;overflow-wrap:anywhere}
 .comparison-price-message,.comparison-price-unavailable{padding:8px 0;font-size:10px;line-height:1.6;color:var(--muted);white-space:normal}
 @media(max-width:1180px){
   .pricing-card .pricing-layout{grid-template-columns:minmax(0,1fr) minmax(210px,.3fr);gap:14px}
@@ -374,6 +384,8 @@
   .comparison-api-list{gap:4px;line-height:1.3}
   .comparison-api-list>div{grid-template-columns:1fr;gap:1px}
   .comparison-api-list .comparison-api-name{font-size:10px}
+  .comparison-table tr[data-comparison-field="api_price"] .comparison-api-list>div{grid-template-columns:minmax(0,1fr) minmax(0,1.05fr);gap:6px;align-items:start}
+  .comparison-table tr[data-comparison-field="api_price"] .comparison-api-name{font-size:9px;line-height:1.3}
   .comparison-table tr:has(.comparison-chart-cell){break-inside:avoid;page-break-inside:avoid}
   .comparison-table td.comparison-chart-cell,.comparison-table td:has(.comparison-composition){padding:5px;vertical-align:top}
   .comparison-composition .composition-charts{grid-template-columns:1fr;gap:4px;padding:0;align-items:start}
@@ -403,14 +415,15 @@
   .comparison-price-plot{height:40px;margin:3px 0 13px;border-bottom-width:1px}
   .comparison-price-bars{gap:2px}
   .comparison-price-year{padding:0 1px;border-radius:2px 2px 0 0}
-  .comparison-price-fill{width:min(14px,100%);border-radius:2px 2px 0 0}
-  .comparison-cost-fill{width:min(6px,50%);border-radius:1px 1px 0 0}
+  .comparison-price-stack{width:min(14px,100%);border-radius:2px 2px 0 0}
+  .comparison-year-rate{font-size:6.5px;line-height:8px;letter-spacing:-.15px}
+  .comparison-year-rate.unavailable{font-size:5.5px;letter-spacing:-.3px}
   .comparison-price-label{bottom:-12px;font-size:7px;line-height:10px}
   .comparison-price-legend{margin-top:2px;font-size:8px;line-height:1.3;gap:2px 7px}
-  .comparison-price-key,.comparison-cost-key{gap:3px}
-  .comparison-price-key::before,.comparison-cost-key::before{width:5px;height:7px;border-radius:1px 1px 0 0}
-  .comparison-cost-key::before{width:4px}
+  .comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key{gap:3px}
+  .comparison-price-key::before,.comparison-cost-key::before,.comparison-excess-key::before,.comparison-unknown-key::before{width:5px;height:7px;border-radius:1px 1px 0 0}
+  .comparison-api-prices{gap:1px;font-size:9px;line-height:1.3}
   .comparison-price-message,.comparison-price-unavailable{padding:4px 0;font-size:8px;line-height:1.3}
-  .comparison-price-chart,.comparison-price-fill,.comparison-cost-fill,.comparison-price-legend,.comparison-price-key,.comparison-cost-key,.comparison-donut-year{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .comparison-price-chart,.comparison-price-stack,.comparison-price-fill,.comparison-cost-fill,.comparison-excess-fill,.comparison-unresolved-fill,.comparison-price-legend,.comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key,.comparison-donut-year{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .comparison-composition,.composition-donut,.composition-stack,.legend-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
