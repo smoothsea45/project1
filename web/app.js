@@ -384,7 +384,7 @@
     for (const [id, field] of Object.entries({'api-batch': 'api_batch', 'excipient-batch': 'excipient_batch', 'api-unit': 'api_unit', 'excipient-unit': 'excipient_unit', 'packaging-unit': 'packaging_unit', 'labor-unit': 'labor_unit'})) $(id).textContent = format(result[field]);
     markValidation(result);
     $('result-cost').textContent = format(result.total_cost);
-    $('result-price').textContent = format(result.pricing.amount, 2, '미입력');
+    $('result-price').textContent = format(result.pricing.amount, 0, '미입력');
     $('result-rate').textContent = percentage(result.cost_rate, '계산 불가', false);
     $('batch-total-note').textContent = '배치 전체 비용 ' + format(result.batch_total) + ' 원';
     renderPricing(result.pricing); renderComposition(result); renderComparison();
@@ -398,7 +398,7 @@
     $('manual-price-wrap').hidden = automatic;
     $('manual-price').disabled = automatic;
     $('calculated-price-wrap').hidden = !automatic;
-    $('calculated-price').textContent = format(pricing.amount, 2, '계산 불가');
+    $('calculated-price').textContent = format(pricing.amount, 0, '계산 불가');
     $('selected-pricing-year').textContent = '선택 연차: ' + p.selected_year + '년차';
     $('pricing-company-details').hidden = simple || !s.company_type || s.company_type === 'general';
     $('pricing-base-criteria').hidden = p.general_category === 'biologic' || p.supply_category !== 'none';
@@ -454,7 +454,7 @@
       if (last && last.amount.eq(year.amount) && last.assumption === year.assumption) last.end = year.year;
       else groups.push({start: year.year, end: year.year, amount: year.amount, assumption: year.assumption});
     }
-    $('pricing-forecast-summary').textContent = groups.map(group => group.start + (group.end === group.start ? '' : '~' + group.end) + '년차 ' + format(group.amount) + '원' + (group.assumption ? ' (연장요건 충족 가정)' : '')).join(' → ');
+    $('pricing-forecast-summary').textContent = groups.map(group => group.start + (group.end === group.start ? '' : '~' + group.end) + '년차 ' + format(group.amount, 0) + '원' + (group.assumption ? ' (연장요건 충족 가정)' : '')).join(' → ');
     const s = active();
     const company = {general: '일반기업', innovative: '혁신형 제약기업', near: '준혁신형 제약기업', supply_leader: '수급안정 선도기업'}[s.company_type];
     $('pricing-forecast-context').textContent = pricing.model === 'simplified-v1'
@@ -471,7 +471,7 @@
       button.dataset.pricingYear = year.year;
       button.dataset.amount = year.amount.toString();
       button.setAttribute('aria-pressed', String(selected));
-      const amount = format(year.amount);
+      const amount = format(year.amount, 0);
       const tooltip = year.year + '년차 · ' + amount + ' 원/T · ' + year.start_date + '~' + year.end_date + '\n' + (year.label || '') + (year.rate_label ? ' · ' + year.rate_label : '') + (year.assumption ? ' · 연장요건 충족 가정' : '');
       button.title = tooltip;
       button.setAttribute('aria-label', tooltip);
@@ -617,7 +617,7 @@
     part('donut-rate').style.fontSize = centerRate.includes('%') ? Math.max(10, Math.min(root.classList.contains('comparison-composition') ? 22 : 32, Math.floor((root.classList.contains('comparison-composition') ? 156 : 224) / centerRate.length))) + 'px' : '18px';
     part('donut-total').textContent = complete ? money(total) + ' 원/T' : '제조원가 미완성';
     part('composition-remainder').textContent = complete && validPrice ? money(price.minus(total)) + ' 원/T' : '계산 불가';
-    part('donut-note').textContent = !complete ? '보험약가 기준 · 비용 입력 미완성' : !validPrice ? '보험약가 미입력·0·미확인' : overPrice ? '약가 초과 · 도넛은 제조원가 기준' : '보험약가 기준 · ' + money(price) + ' 원/T';
+    part('donut-note').textContent = !complete ? '보험약가 기준 · 비용 입력 미완성' : !validPrice ? '보험약가 미입력·0·미확인' : overPrice ? '약가 초과 · 도넛은 제조원가 기준' : '보험약가 기준 · ' + format(price, 0) + ' 원/T';
     if (!complete) notices.push('필수 비용을 입력하면 두 그래프의 비율을 표시합니다. 계산 가능한 항목의 금액은 유지합니다.');
     else {
       if (!validPrice) notices.push('보험약가가 없거나 0 또는 미확인 상태여서 도넛의 약가 대비 비율은 계산 불가입니다.');
@@ -626,7 +626,7 @@
     }
     part('composition-status').textContent = notices.join(' ');
     part('composition-status').hidden = notices.length === 0;
-    donut.setAttribute('aria-label', notices.length ? centerRate + ', 총 제조원가 ' + money(total) + ' 원/T. ' + notices.join(' ') : '보험약가 ' + money(price) + ' 원/T 기준 API·부형제·포장재비·공수비와 차액. 제조원가율 ' + centerRate + ', 제조원가 ' + money(total) + ' 원/T.');
+    donut.setAttribute('aria-label', notices.length ? centerRate + ', 총 제조원가 ' + money(total) + ' 원/T. ' + notices.join(' ') : '보험약가 ' + format(price, 0) + ' 원/T 기준 API·부형제·포장재비·공수비와 차액. 제조원가율 ' + centerRate + ', 제조원가 ' + money(total) + ' 원/T.');
   }
   function renderComparison() {
     $('comparison-head').replaceChildren(); $('comparison-body').replaceChildren();
@@ -678,7 +678,7 @@
       ['packaging_form', '포장형태', s => s.packaging_form || '미입력'],
       ['api_supplier', 'API 제조원', s => apiDetails(s, m => m.supplier || '제조원 미입력')],
       ['api_price', 'API 단가', s => apiDetails(s, m => comparisonApiPrices(s, m))],
-      ['price', '우리 제품 약가 (원/T)', (s, r) => format(r.pricing.amount, 1, '계산 불가')],
+      ['price', '우리 제품 약가 (원/T)', (s, r) => format(r.pricing.amount, 0, '계산 불가')],
       ['total_cost', '제조원가 (원/T)', (s, r) => format(r.total_cost, 1)],
       ['cost_rate', '제조원가율 (%)', (s, r) => rate(r.cost_rate)],
       ['composition', '비용 구성 그래프', (s, r) => {
@@ -752,7 +752,7 @@
       button.dataset.amount = year.amount.toString();
       button.setAttribute('aria-pressed', String(selected === year.year));
       const ratio = result.total_cost !== null && year.amount.gt(0) ? result.total_cost.div(year.amount).mul(100) : null;
-      button.title = year.year + '년차 · 약가 ' + format(year.amount, 1) + ' 원/T · 제조원가 ' + format(result.total_cost, 1) + (result.total_cost === null ? '' : ' 원/T')
+      button.title = year.year + '년차 · 약가 ' + format(year.amount, 0) + ' 원/T · 제조원가 ' + format(result.total_cost, 1) + (result.total_cost === null ? '' : ' 원/T')
         + ' · 제조원가율 ' + percentage(ratio)
         + (year.start_date ? '\n' + year.start_date + '~' + year.end_date : '') + (year.label ? '\n' + year.label : '');
       button.setAttribute('aria-label', scenario.name + ' ' + button.title);
@@ -788,8 +788,8 @@
       const ratioText = ratio === null ? '계산불가' : ratio.gte(1000) ? ratio.toExponential(1).replace('e+', 'e') + '%' : percentage(ratio);
       const ratioLabel = element('span', ratioText, 'comparison-year-rate' + (costFraction.lt('0.14') ? ' compact' : '') + (result.total_cost !== null && result.total_cost.isZero() ? ' zero' : '') + (ratio === null ? ' unavailable' : ''));
       ratioLabel.title = '제조원가율 ' + percentage(ratio);
-      const priceLabel = element('span', format(year.amount, 1) + '원', 'comparison-year-price');
-      priceLabel.title = year.year + '년차 약가 ' + format(year.amount, 1) + ' 원/T';
+      const priceLabel = element('span', format(year.amount, 0) + '원', 'comparison-year-price');
+      priceLabel.title = year.year + '년차 약가 ' + format(year.amount, 0) + ' 원/T';
       column.append(stack, priceLabel, ratioLabel);
       button.append(column, element('span', String(year.year), 'comparison-price-label'));
       button.addEventListener('click', () => {

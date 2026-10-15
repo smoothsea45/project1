@@ -434,7 +434,7 @@ def test_pricing_mode_is_beside_title_and_loaded_automatic_mode_uses_calculated_
     assert scenario(page)["pricing_mode"] == "official"
     results(page)
     expect(page.locator("#result-cost")).to_have_text("50.00")
-    expect(page.locator("#result-price")).to_have_text("450.00")
+    expect(page.locator("#result-price")).to_have_text("450")
     expect(page.locator("#pricing-source")).to_contain_text("1년차")
     expect(page.locator("#result-rate")).to_have_text("11.1")
     assert scenario(page)["manual_price"] == "300"
@@ -545,7 +545,7 @@ def test_legacy_multiple_drug_additions_are_preserved_without_hidden_condition_b
     page.locator('[data-field="identical_count_band"][value="lt14"]').check()
     page.locator("#original-price").fill("1000")
     page.locator('[data-pricing-field="listing_date"]').fill("2027-09-01")
-    expect(page.locator("#calculated-price")).to_have_text("680.00")
+    expect(page.locator("#calculated-price")).to_have_text("680")
     expect(page.locator('[data-pricing-year]')).to_have_count(10)
     assert scenario(page)["manual_price"] == "300"
     saved = save_file(page, tmp_path / "simplified.json")

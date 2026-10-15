@@ -94,10 +94,25 @@ def test_comparison_precision_applies_to_cells_charts_and_tooltips_only(page, tm
       return Object.fromEntries(keys.map(key => [key, r[key].toString()]));
     }""")
     results(page)
+    expect(page.locator("#result-price")).to_have_text("300")
     expect(page.locator("#result-cost")).to_have_text(display(raw["total_cost"], 2))
     expect(page.locator("#donut-total")).to_have_text(display(raw["total_cost"], 2) + " 원/T")
+    expect(page.locator("#donut-note")).to_have_text("보험약가 기준 · 300 원/T")
+    expect(page.locator("#composition-donut")).to_have_attribute(
+        "aria-label", re.compile(r"^보험약가 300 원/T 기준")
+    )
+    # Display rounding must never replace the actual insurance-price denominator.
+    with localcontext() as context:
+        context.prec = 80
+        actual_rate = Decimal(raw["cost_rate"])
+        expected_rate = Decimal(raw["total_cost"]) / Decimal("300.12654321") * 100
+        rounded_price_rate = Decimal(raw["total_cost"]) / Decimal("300") * 100
+        assert abs(actual_rate - expected_rate) < Decimal("1e-40")
+        assert abs(actual_rate - rounded_price_rate) > Decimal("0.0001")
+    expect(page.locator("#result-rate")).to_have_text(display(raw["cost_rate"], 1))
     comparison(page)
-    expect(comparison_row(page, "price").locator("td")).to_have_text("300.1")
+    expect(comparison_row(page, "price").locator("td")).to_have_text("300")
+    expect(comparison_row(page, "cost_rate").locator("td")).to_have_text(display(raw["cost_rate"], 1) + "%")
     expect(comparison_row(page, "total_cost").locator("td")).to_have_text(display(raw["total_cost"], 1))
     for field, batch, unit in [
         ("api_cost", raw["api_batch"], raw["api_unit"]),
@@ -112,19 +127,34 @@ def test_comparison_precision_applies_to_cells_charts_and_tooltips_only(page, tm
         expect(batch_cell).to_have_attribute("title", f"배치당: {display(batch, 0)} 원")
         expect(unit_cell).to_have_attribute("title", f"1T당: {display(unit, 1)} 원/T")
     graph = comparison_chart(page, active_id)
+    expect(graph.locator('[data-chart-part="note"]')).to_have_text("보험약가 기준 · 300 원/T")
     expect(graph.locator(".donut-total")).to_have_text(display(raw["total_cost"], 1) + " 원/T")
     expect(graph.locator('[data-chart-part="raw-total"]')).to_have_text(display(raw["raw_unit"], 1) + " 원/T")
     for item, key in [("api", "api_unit"), ("excipient", "excipient_unit"), ("packaging", "packaging_unit"), ("labor", "labor_unit")]:
         expect(graph.locator(f'.composition-row[data-item="{item}"] .composition-amount')).to_have_text(display(raw[key], 1) + " 원/T")
-    # Every monetary label in either comparison chart uses one place per tablet.
-    for text in [graph.inner_text(), *graph.locator("title").all_text_contents(),
-                 page.locator(".comparison-price-chart").inner_text(),
-                 *page.locator(".comparison-price-year").evaluate_all("nodes => nodes.map(node => node.title)")]:
+    # Cost labels, segment tooltips and the common scale retain one place per T.
+    cost_texts = graph.locator(
+        '.donut-total, .composition-amount, [data-chart-part="raw-total"], [data-chart-part="remainder"]'
+    ).all_text_contents()
+    cost_texts.extend(graph.locator("title").all_text_contents())
+    cost_texts.extend(graph.locator(".composition-segment").evaluate_all("nodes => nodes.map(node => node.title)"))
+    cost_texts.extend(page.locator(".comparison-price-scale, .comparison-cost-key").all_text_contents())
+    for text in cost_texts:
         for amount in re.findall(r"([\d,]+(?:\.\d+)?)\s*원/T", text):
             assert re.fullmatch(r"[\d,]+\.\d", amount), text
+    # Each bar separately distinguishes its integer drug price from its cost.
+    expect(page.locator(".comparison-year-price")).to_have_text(["300원"] * 8)
+    for title in page.locator(".comparison-price-year").evaluate_all("nodes => nodes.map(node => node.title)"):
+        price = re.search(r"약가 ([\d,]+(?:\.\d+)?) 원/T", title)
+        cost = re.search(r"제조원가 ([\d,]+(?:\.\d+)?) 원/T", title)
+        assert price and price.group(1) == "300", title
+        assert cost and cost.group(1) == display(raw["total_cost"], 1), title
+        assert re.fullmatch(r"[\d,]+", price.group(1)), title
+        assert re.fullmatch(r"[\d,]+\.\d", cost.group(1)), title
     assert project(page) == before
     saved = save_file(page, tmp_path / "comparison-display-precision.json")
     assert saved == before
+    assert saved["scenarios"][0]["manual_price"] == "300.12654321"
     assert saved["scenarios"][0]["materials"][0]["price"] == "1000000.123456789"
 
 

@@ -94,7 +94,7 @@ def test_dragging_four_tabs_updates_comparison_order_without_mutating_scenario_d
     assert page.locator("#comparison-head th[data-scenario-id]").evaluate_all(
         "cells => cells.map(cell => cell.dataset.scenarioId)"
     ) == expected
-    expect(comparison_row(page, "price").locator("td")).to_have_text(["100.0", "300.0", "200.0", "400.0"])
+    expect(comparison_row(page, "price").locator("td")).to_have_text(["100", "300", "200", "400"])
     assert comparison_row(page, "api_cost").locator('td[data-cost-basis="unit"]').evaluate_all(
         "cells => cells.map(cell => cell.dataset.scenarioId)"
     ) == expected
@@ -158,7 +158,7 @@ def test_reordering_comparison_keeps_year_previews_attached_to_scenario_ids(page
     native_drag(page, second_id, first_id)
     expect_order(page, [second_id, first_id])
 
-    for scenario_id, year, price, cost_rate in [(first_id, 5, "383.0", "13.1%"), (second_id, 6, "765.0", "7.8%")]:
+    for scenario_id, year, price, cost_rate in [(first_id, 5, "383", "13.1%"), (second_id, 6, "765", "7.8%")]:
         expect(comparison_cell(page, "price", scenario_id)).to_have_text(price)
         expect(comparison_cell(page, "cost_rate", scenario_id)).to_have_text(cost_rate)
         expect(comparison_cell(page, "composition", scenario_id).locator(".comparison-donut-year")).to_have_text(f"{year}년차")

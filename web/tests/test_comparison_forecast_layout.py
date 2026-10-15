@@ -18,11 +18,11 @@ from web.tests.test_pricing import comparison_cell, comparison_chart, comparison
 from web.tests.test_tabs_print import clone
 
 
-def money_one(value):
+def price_integer(value):
     with localcontext() as context:
         context.prec = 80
-        rounded = Decimal(value).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
-        return f"{rounded:,.1f}"
+        rounded = Decimal(value).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
+        return f"{rounded:,.0f}"
 
 
 def overlaps(first, second):
@@ -60,13 +60,13 @@ def test_comparison_has_eight_years_and_price_labels_while_input_forecast_remain
         condition(page, "domestic_extension").check()
         page.locator('[data-pricing-year="10"]').click()
         expect(page.locator("[data-pricing-year]")).to_have_count(10)
-        expected_prices = ["600.0원"] * 4 + ["383.0원"] * 4
+        expected_prices = ["600원"] * 4 + ["383원"] * 4
         expected_rates = ["8.3%"] * 4 + ["13.1%"] * 4
     else:
         setup_base(page)
         add_material(page)
         page.locator("#manual-price").fill("1234.56789")
-        expected_prices = ["1,234.6원"] * 8
+        expected_prices = ["1,235원"] * 8
         expected_rates = ["4.1%"] * 8
     before = project(page)
     current_id = scenario(page)["id"]
@@ -137,25 +137,25 @@ def test_special_cost_states_keep_distinct_legible_price_and_rate_labels(page, c
     page.locator("#batch-packaging").fill("0")
     page.locator("#batch-labor").fill("0")
     if case == "zero_cost":
-        expected_price, expected_rate = "300.0원", "0.0%"
+        expected_price, expected_rate = "300원", "0.0%"
     elif case == "zero_price":
         page.locator("#manual-price").fill("0")
         page.locator("#batch-labor").fill("5000000")
-        expected_price, expected_rate = "0.0원", "계산불가"
+        expected_price, expected_rate = "0원", "계산불가"
     elif case == "both_zero":
         page.locator("#manual-price").fill("0")
-        expected_price, expected_rate = "0.0원", "계산불가"
+        expected_price, expected_rate = "0원", "계산불가"
     elif case == "missing_cost":
         row = add_material(page)
         row.locator('[data-material-field="amount"]').fill("")
-        expected_price, expected_rate = "300.0원", "계산불가"
+        expected_price, expected_rate = "300원", "계산불가"
     elif case == "tiny_cost":
         page.locator("#batch-labor").fill("1000")
-        expected_price, expected_rate = "300.0원", "<0.1%"
+        expected_price, expected_rate = "300원", "<0.1%"
     else:
         page.locator("#manual-price").fill("25")
         page.locator("#batch-labor").fill("5000000")
-        expected_price, expected_rate = "25.0원", "200.0%"
+        expected_price, expected_rate = "25원", "200.0%"
     current_id = scenario(page)["id"]
     before = project(page)
     comparison(page)
@@ -188,13 +188,13 @@ def test_real_price_edits_update_price_labels_rates_and_preview_together_without
     current_id = scenario(page)["id"]
     comparison(page)
     chart = comparison_chart(page, current_id)
-    expect(chart.locator(".comparison-year-price")).to_have_text(["891.2원"] * 8)
+    expect(chart.locator(".comparison-year-price")).to_have_text(["891원"] * 8)
     expect(chart.locator(".comparison-year-rate")).to_have_text(["5.6%"] * 8)
     old_height = comparison_year(page, current_id, 1).locator(".comparison-cost-fill").bounding_box()["height"]
     page.locator("#tab-button-input").click()
     page.locator("#manual-price").fill("445.617283945")
     comparison(page)
-    expect(chart.locator(".comparison-year-price")).to_have_text([money_one("445.617283945") + "원"] * 8)
+    expect(chart.locator(".comparison-year-price")).to_have_text([price_integer("445.617283945") + "원"] * 8)
     expect(chart.locator(".comparison-year-rate")).to_have_text(["11.2%"] * 8)
     assert comparison_year(page, current_id, 1).locator(".comparison-cost-fill").bounding_box()["height"] > old_height * 1.9
     comparison_year(page, current_id, 8).click()

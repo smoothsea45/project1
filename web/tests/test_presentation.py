@@ -55,7 +55,7 @@ def test_money_and_percent_precision_are_display_only(page):
     ]:
         expect(page.locator(selector)).to_have_text(expected)
     results(page)
-    expect(page.locator("#result-price")).to_have_text("300.00")
+    expect(page.locator("#result-price")).to_have_text("300")
     expect(page.locator("#result-cost")).to_have_text("50.13")
     expect(page.locator("#result-rate")).to_have_text("16.7")
     expect(page.locator("#donut-rate")).to_have_text("16.7%")
@@ -168,7 +168,7 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
     expect(comparison_row(page, "yield_percent").locator("td").nth(1)).to_have_text("80.0%")
     expect(comparison_row(page, "api_supplier").locator("td").nth(1)).to_contain_text("대체 제조원")
     expect(comparison_row(page, "api_price").locator("td").nth(1)).to_contain_text("400,000 원/kg")
-    expect(comparison_row(page, "price").locator("td").nth(1)).to_have_text("300.0")
+    expect(comparison_row(page, "price").locator("td").nth(1)).to_have_text("300")
     for field, expected in [
         ("total_cost", "47.5"), ("cost_rate", "15.8%"),
     ]:

@@ -78,7 +78,7 @@ def test_manual_mode_blocks_actual_pricing_edits_but_keeps_cost_inputs_enabled(p
     page.locator('[data-material-field="price"]').fill('500000')
     results(page)
     expect(page.locator('#result-cost')).to_have_text('40.00')
-    expect(page.locator('#result-price')).to_have_text('300.00')
+    expect(page.locator('#result-price')).to_have_text('300')
     expect(page.locator('#result-rate')).to_have_text('13.3')
 
 
@@ -86,10 +86,10 @@ def test_manual_and_automatic_prices_do_not_overwrite_each_other(page):
     setup_automatic(page)
     expect(page.locator('#manual-price')).to_be_hidden()
     expect(page.locator('#manual-price')).to_be_disabled()
-    expect(page.locator('#calculated-price')).to_have_text('450.00')
+    expect(page.locator('#calculated-price')).to_have_text('450')
     assert scenario(page)['manual_price'] == '300'
     results(page)
-    expect(page.locator('#result-price')).to_have_text('450.00')
+    expect(page.locator('#result-price')).to_have_text('450')
     expect(page.locator('#result-rate')).to_have_text('11.1')
     page.locator('#tab-button-input').click()
     mode(page, 'manual')
@@ -97,11 +97,11 @@ def test_manual_and_automatic_prices_do_not_overwrite_each_other(page):
     expect(page.locator('#manual-price')).to_be_enabled()
     expect(page.locator('#pricing-forecast')).to_be_hidden()
     results(page)
-    expect(page.locator('#result-price')).to_have_text('300.00')
+    expect(page.locator('#result-price')).to_have_text('300')
     expect(page.locator('#result-rate')).to_have_text('16.7')
     page.locator('#tab-button-input').click()
     mode(page, 'official')
-    expect(page.locator('#calculated-price')).to_have_text('450.00')
+    expect(page.locator('#calculated-price')).to_have_text('450')
     expect(page.locator('[data-pricing-year="1"]')).to_have_attribute('aria-pressed', 'true')
 
 
@@ -117,7 +117,7 @@ def test_ten_vertical_bars_show_anniversary_periods_and_selected_price_drives_co
     last = page.locator('[data-pricing-year="10"]')
     expect(first.locator('.pricing-year-label')).to_contain_text('2027')
     expect(last.locator('.pricing-year-label')).to_contain_text('2036')
-    expect(first).to_have_attribute('title', '1년차 · 600.00 원/T · 2027-09-01~2028-08-31\n혁신형 기업가산 · 기본약가 × 60/45')
+    expect(first).to_have_attribute('title', '1년차 · 600 원/T · 2027-09-01~2028-08-31\n혁신형 기업가산 · 기본약가 × 60/45')
     assert '2036-09-01~2037-08-31' in last.get_attribute('title')
     fills = page.locator('.pricing-year-fill')
     boxes = [fill.bounding_box() for fill in fills.all()]
@@ -128,20 +128,20 @@ def test_ten_vertical_bars_show_anniversary_periods_and_selected_price_drives_co
         assert left['height'] > left['width']
     assert boxes[0]['height'] > boxes[4]['height']
     page.locator('[data-pricing-year="5"]').click()
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
     expect(page.locator('#selected-pricing-year')).to_have_text('선택 연차: 5년차')
     expect(page.locator('[data-pricing-year][aria-pressed="true"]')).to_have_count(1)
     expect(page.locator('[data-pricing-year="5"]')).to_have_attribute('aria-pressed', 'true')
     results(page)
     expect(page.locator('#result-cost')).to_have_text('50.00')
-    expect(page.locator('#result-price')).to_have_text('383.00')
+    expect(page.locator('#result-price')).to_have_text('383')
     expect(page.locator('#result-rate')).to_have_text('13.1')
     expect(page.locator('#donut-rate')).to_have_text('13.1%')
     comparison(page)
     price_row = page.locator('#comparison-body tr[data-compare-field="price"]')
     if not price_row.count():
         price_row = page.locator('#comparison-body tr').filter(has=page.get_by_role('rowheader', name='우리 제품 약가 (원/T)', exact=True))
-    expect(price_row.locator('td').first).to_have_text('600.0')
+    expect(price_row.locator('td').first).to_have_text('600')
 
 
 def test_conditions_recalculate_immediately_and_incomplete_inputs_remove_old_forecast(page):
@@ -179,20 +179,20 @@ def test_auto_conditions_and_selected_year_survive_reload_save_open_and_clone(pa
     page.reload()
     page.wait_for_function('Boolean(window.PharmaCostApp)')
     assert project(page) == expected
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
     expect(page.locator('[data-pricing-year="5"]')).to_have_attribute('aria-pressed', 'true')
     new_project(page)
     open_file(page, path)
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
     assert project(page) == expected
     expect(page.locator('[data-field="pricing_mode"][value="official"]')).to_be_checked()
     expect(condition(page, 'domestic_extension')).to_be_checked()
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
     original = scenario(page)
     page.once('dialog', lambda dialog: dialog.accept('연장 제외안'))
     page.locator('#clone-scenario').click()
     condition(page, 'domestic_extension').uncheck()
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
     condition(page, 'own_data').uncheck()
     assert scenario(page)['pricing_conditions']['own_data'] is False
     select_scenario(page, original['id'])
@@ -221,7 +221,7 @@ def test_general_and_supply_categories_are_independent_single_selections_without
     page.locator('[data-field="company_type"][value="supply_leader"]').check()
     assert scenario(page)['company_type'] == 'supply_leader'
     condition(page, 'general_category', 'none').check()
-    expect(page.locator('#calculated-price')).to_have_text('680.00')
+    expect(page.locator('#calculated-price')).to_have_text('680')
 
 def test_company_eligibility_is_preserved_and_supply_choice_applies_without_duplicate_bonuses(page):
     setup_automatic(page, company='innovative')
@@ -257,13 +257,13 @@ def test_simple_general_schedules_use_original_price_and_need_no_extra_inputs(pa
     setup_automatic(page)
     condition(page, 'general_category', category).check()
     assert amounts(page) == expected
-    expect(page.locator('#calculated-price')).to_have_text(f'{int(expected[0]):,.2f}')
+    expect(page.locator('#calculated-price')).to_have_text(f'{int(expected[0]):,d}')
     # Every percentage uses the single original reference price.
     page.locator('#original-price').fill('2000')
     assert amounts(page) == [str(int(value) * 2) for value in expected]
     expect(page.locator('#pricing-forecast-context')).to_contain_text('간편')
     results(page)
-    expect(page.locator('#result-price')).to_have_text(f'{int(expected[0]) * 2:,.2f}')
+    expect(page.locator('#result-price')).to_have_text(f'{int(expected[0]) * 2:,d}')
     assert scenario(page)['manual_price'] == '300'
 
 
@@ -305,7 +305,7 @@ def test_old_detailed_conditions_remain_in_json_but_cannot_block_simplified_pric
         'general_long_extension': True, 'migration_review': '이전 상세조건 확인 필요',
     })
     open_file(page, {'name': 'old-details.json', 'mimeType': 'application/json', 'buffer': json.dumps(payload, ensure_ascii=False).encode('utf-8')})
-    expect(page.locator('#calculated-price')).to_have_text('700.00')
+    expect(page.locator('#calculated-price')).to_have_text('700')
     assert amounts(page) == ['700'] * 4 + ['450'] * 6
     assert scenario(page)['pricing_conditions']['model_id'] == 'simplified-v1'
     assert scenario(page)['pricing_conditions']['general_long_extension'] is True
@@ -317,7 +317,7 @@ def test_old_detailed_conditions_remain_in_json_but_cannot_block_simplified_pric
     mode(page, 'manual')
     expect(page.locator('#manual-price')).to_have_value('300')
     results(page)
-    expect(page.locator('#result-price')).to_have_text('300.00')
+    expect(page.locator('#result-price')).to_have_text('300')
 
 
 @pytest.mark.parametrize('value', ['-1', '0', ''])
@@ -371,8 +371,8 @@ def test_comparison_year_previews_start_at_one_and_update_only_their_own_scenari
     before = project(page)
     assert [item['pricing_conditions']['selected_year'] for item in before['scenarios']] == [5, 5]
     comparison(page)
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('600.0')
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.0')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('600')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200')
     expect(comparison_cell(page, 'cost_rate', first_id)).to_have_text('8.3%')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('5.0%')
     for scenario_id, cost in [(first_id, '50'), (second_id, '60')]:
@@ -391,29 +391,29 @@ def test_comparison_year_previews_start_at_one_and_update_only_their_own_scenari
     comparison_year(page, first_id, 5).click()
     expect(comparison_cell(page, 'composition', first_id).locator('.comparison-donut-year')).to_have_text('5년차')
     expect(comparison_cell(page, 'composition', second_id).locator('.comparison-donut-year')).to_have_text('1년차')
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.0')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('383')
     expect(comparison_cell(page, 'cost_rate', first_id)).to_have_text('13.1%')
     expect(comparison_year(page, first_id, 5).locator('.comparison-year-rate')).to_have_text('13.1%')
     expect(comparison_cell(page, 'composition', first_id).locator('[data-chart-part="rate"]')).to_have_text('13.1%')
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200.0')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('1,200')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('5.0%')
     comparison_year(page, second_id, 6).click()
     expect(comparison_cell(page, 'composition', first_id).locator('.comparison-donut-year')).to_have_text('5년차')
     expect(comparison_cell(page, 'composition', second_id).locator('.comparison-donut-year')).to_have_text('6년차')
     assert page.locator('.comparison-price-chart').evaluate_all('nodes => nodes.map(node => node.dataset.scaleMaximum)') == scales
-    expect(comparison_cell(page, 'price', second_id)).to_have_text('765.0')
+    expect(comparison_cell(page, 'price', second_id)).to_have_text('765')
     expect(comparison_cell(page, 'cost_rate', second_id)).to_have_text('7.8%')
     expect(comparison_year(page, second_id, 6).locator('.comparison-year-rate')).to_have_text('7.8%')
-    expect(comparison_cell(page, 'price', first_id)).to_have_text('383.0')
+    expect(comparison_cell(page, 'price', first_id)).to_have_text('383')
     expect(comparison_year(page, first_id, 5)).to_have_attribute('aria-pressed', 'true')
     assert project(page) == before
     assert save_file(page, tmp_path / 'comparison-preview.json') == before
     page.locator('#tab-button-input').click()
     expect(page.locator('#selected-pricing-year')).to_have_text('선택 연차: 5년차')
-    expect(page.locator('#calculated-price')).to_have_text('765.00')
+    expect(page.locator('#calculated-price')).to_have_text('765')
     select_scenario(page, first_id)
     expect(page.locator('#selected-pricing-year')).to_have_text('선택 연차: 5년차')
-    expect(page.locator('#calculated-price')).to_have_text('383.00')
+    expect(page.locator('#calculated-price')).to_have_text('383')
 
 
 @pytest.mark.parametrize('manual_price', ['300', '0', '25'])
@@ -468,7 +468,7 @@ def test_manual_comparison_forecast_has_eight_flat_prices_and_visible_cost_refer
         colors = [fill.evaluate('node => getComputedStyle(node).backgroundColor') for fill in fills]
         assert len(set(colors)) == len(fills)
         price_label = button.locator('.comparison-year-price')
-        expect(price_label).to_have_text(f'{actual_price:,.1f}원')
+        expect(price_label).to_have_text(f'{actual_price:,d}원')
         price_label_box = price_label.bounding_box()
         assert price_label_box['y'] + price_label_box['height'] <= stack_box['y'] + 1
         rate_label = button.locator('.comparison-year-rate')
@@ -481,7 +481,7 @@ def test_manual_comparison_forecast_has_eight_flat_prices_and_visible_cost_refer
         else:
             assert label_box['y'] >= price_label_box['y'] + price_label_box['height'] - 1
     comparison_year(page, current['id'], 7).click()
-    expect(comparison_cell(page, 'price', current['id'])).to_have_text(f'{int(manual_price):,.1f}')
+    expect(comparison_cell(page, 'price', current['id'])).to_have_text(f'{int(manual_price):,d}')
     expect(comparison_cell(page, 'cost_rate', current['id'])).to_have_text('계산 불가' if manual_price == '0' else '200.0%' if manual_price == '25' else '16.7%')
     assert scenario(page) == current
     assert 'NaN' not in chart.inner_text()
@@ -599,3 +599,28 @@ def test_comparison_small_price_keeps_actual_rate_and_uses_compact_graph_label(p
     expect(button.locator('.comparison-cost-fill')).to_have_attribute('data-segment-amount', '1')
     expect(button.locator('.comparison-excess-fill')).to_have_attribute('data-excess', '49')
     assert comparison_chart(page, current_id).get_attribute('data-scale-maximum') == '62.5'
+
+
+def test_integer_drug_price_display_preserves_raw_decimal_price_and_cost_rate(page, tmp_path):
+    setup_base(page)
+    add_material(page)
+    page.locator('#manual-price').fill('300.49')
+    current_id = scenario(page)['id']
+    results(page)
+    expect(page.locator('#result-price')).to_have_text('300')
+    expect(page.locator('#result-cost')).to_have_text('50.00')
+    expect(page.locator('#result-rate')).to_have_text('16.6')
+    expect(page.locator('#donut-note')).to_contain_text('300 원/T')
+    comparison(page)
+    expect(comparison_cell(page, 'price', current_id)).to_have_text('300')
+    expect(comparison_cell(page, 'cost_rate', current_id)).to_have_text('16.6%')
+    button = comparison_year(page, current_id, 1)
+    expect(button).to_have_attribute('data-amount', '300.49')
+    expect(button.locator('.comparison-year-price')).to_have_text('300원')
+    expect(button.locator('.comparison-price-fill')).to_have_attribute('data-remainder', '250.49')
+    expect(button.locator('.comparison-year-rate')).to_have_text('16.6%')
+    assert '약가 300 원/T' in button.get_attribute('title')
+    saved = save_file(page, tmp_path / 'display-precision.json')
+    assert saved['scenarios'][0]['manual_price'] == '300.49'
+    page.locator('#tab-button-input').click()
+    expect(page.locator('#manual-price')).to_have_value('300.49')

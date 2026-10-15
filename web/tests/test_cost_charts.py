@@ -188,7 +188,7 @@ def test_loaded_incomplete_automatic_mode_keeps_cost_stack_and_manual_price_for_
     page.locator('[data-field="pricing_mode"][value="manual"]').check()
     expect(page.locator("#manual-price")).to_have_value("300")
     results(page)
-    expect(page.locator("#result-price")).to_have_text("300.00")
+    expect(page.locator("#result-price")).to_have_text("300")
     expect(page.locator("#donut-rate")).to_have_text("26.7%")
     assert donut_share(page, "api") == pytest.approx(40 / 300 * 100)
     assert stack_share(page, "api") == pytest.approx(50)
