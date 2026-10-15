@@ -36,7 +36,7 @@
 
   function makeMaterial(options) {
     const supplied = typeof options === 'string' ? { kind: options } : (options || {});
-    return Object.assign({ id: newId(), kind: 'api', name: '', supplier: '', amount: null, price: null, price_unit: 'krw_kg' }, supplied);
+    return Object.assign({ id: newId(), kind: 'api', name: '', supplier: '', amount: null, price: null, price_unit: 'krw_g' }, supplied);
   }
 
   function makeScenario(options) {

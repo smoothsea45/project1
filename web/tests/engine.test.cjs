@@ -8,7 +8,7 @@ const path = require('node:path');
 const E = require('../engine.js');
 
 function material(overrides = {}) {
-  return E.makeMaterial({ amount: '20', price: '1000000', ...overrides });
+  return E.makeMaterial({ amount: '20', price: '1000000', price_unit: 'krw_kg', ...overrides });
 }
 function scenario(overrides = {}) {
   return E.makeScenario({ batch_size: '100000', yield_percent: '100', manual_price: '300', materials: [material()], ...overrides });
