@@ -290,7 +290,7 @@
 .comparison-composition .donut-column{position:relative}
 .comparison-donut-year{position:absolute;top:0;left:0;z-index:1;display:inline-flex;align-items:center;padding:3px 7px;border:1px solid #d5e2e7;border-radius:5px;background:#f2f7f9;color:var(--ink-soft);font-size:10px;line-height:1.4;font-weight:600;white-space:nowrap}
 .comparison-table td:has(.comparison-price-chart){padding:10px 12px;vertical-align:top;white-space:normal;text-align:left}
-.comparison-price-chart{width:100%;min-width:0;font-weight:400;font-variant-numeric:tabular-nums}
+.comparison-price-chart{--forecast-price-bonus:#9254a0;--forecast-price-base:#c687b3;--forecast-price-extension:#b06aa9;width:100%;min-width:0;font-weight:400;font-variant-numeric:tabular-nums}
 .comparison-price-heading{display:flex;align-items:baseline;justify-content:space-between;gap:5px;min-height:16px;font-size:10px;line-height:1.5;color:var(--ink-soft);white-space:normal}
 .comparison-price-heading strong{font-weight:600;color:var(--teal-dark)}
 .comparison-price-plot{height:160px;position:relative;margin:9px 0 19px;border-bottom:1px solid #c7d6dc;background:linear-gradient(to top,transparent calc(50% - 1px),#e8eff1 calc(50% - 1px),#e8eff1 50%,transparent 50%)}
@@ -302,7 +302,7 @@
 .comparison-price-column{position:relative;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-width:0}
 .comparison-price-stack{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;width:min(27px,100%);min-height:0;border-radius:3px 3px 0 0;overflow:hidden}
 .comparison-price-fill,.comparison-cost-fill,.comparison-excess-fill,.comparison-unresolved-fill{position:static;display:block;flex:0 0 auto;width:100%;min-height:0;border-radius:0;pointer-events:none}
-.comparison-price-fill{background:#7f94b7}
+.comparison-price-fill{background:var(--forecast-price-base,#c687b3)}
 .comparison-cost-fill{background:#bd7952}
 .comparison-excess-fill{background:#be625d}
 .comparison-unresolved-fill{background:#c4ced3}
@@ -312,14 +312,14 @@
 .comparison-year-rate.compact{bottom:1px;transform:translateX(-50%);padding:0 2px;border:1px solid #dec3b0;border-radius:3px;background:#fff8f1;color:#8f5737;font-size:8px;line-height:10px;letter-spacing:-.3px;text-shadow:none}
 .comparison-year-rate.zero,.comparison-year-rate.unavailable{bottom:1px;transform:translateX(-50%);padding:0 2px;border:1px solid #d3dee3;border-radius:3px;background:#f4f7f8;color:#718590;font-size:8px;line-height:10px;letter-spacing:-.3px;text-shadow:none}
 .comparison-price-column:has(.comparison-year-rate.compact,.comparison-year-rate.zero,.comparison-year-rate.unavailable) .comparison-year-price{bottom:max(calc(var(--stack-height) + 4px),18px)}
-.comparison-price-year.bonus .comparison-price-fill{background:var(--teal)}
-.comparison-price-year.extension .comparison-price-fill{background:#66afa5}
+.comparison-price-year.bonus .comparison-price-fill{background:var(--forecast-price-bonus,#9254a0)}
+.comparison-price-year.extension .comparison-price-fill{background:var(--forecast-price-extension,#b06aa9)}
 .comparison-price-label{position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);font-size:9px;line-height:14px;white-space:nowrap}
 .comparison-price-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px 9px;margin-top:4px;font-size:10px;line-height:1.5;color:var(--ink-soft);overflow-wrap:anywhere}
 .comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
-.comparison-price-key::before,.comparison-cost-key::before,.comparison-excess-key::before,.comparison-unknown-key::before{content:"";display:block;width:7px;height:9px;border-radius:2px 2px 0 0;background:#7f94b7;flex-shrink:0}
-.comparison-price-key.bonus::before{background:var(--teal)}
-.comparison-price-key.extension::before{background:#66afa5}
+.comparison-price-key::before,.comparison-cost-key::before,.comparison-excess-key::before,.comparison-unknown-key::before{content:"";display:block;width:7px;height:9px;border-radius:2px 2px 0 0;background:var(--forecast-price-base,#c687b3);flex-shrink:0}
+.comparison-price-key.bonus::before{background:var(--forecast-price-bonus,#9254a0)}
+.comparison-price-key.extension::before{background:var(--forecast-price-extension,#b06aa9)}
 .comparison-cost-key::before{background:#bd7952}
 .comparison-excess-key::before{background:#be625d}
 .comparison-unknown-key::before{background:#c4ced3}

@@ -729,7 +729,7 @@
     chart.dataset.scaleMaximum = scale.toString();
     const selected = comparisonYears.get(scenario.id) || 1;
     const heading = element('div', undefined, 'comparison-price-heading');
-    heading.append(element('strong', selected + '년차 기준'), element('span', '공통 축 0~' + format(scale, 1) + ' 원/T', 'comparison-price-scale'));
+    heading.append(element('strong', selected + '년차 기준' + (result.pricing.model === 'simplified-v1' ? ' · 간편 가정' : '')), element('span', '공통 축 0~' + format(scale, 1) + ' 원/T', 'comparison-price-scale'));
     chart.append(heading);
     let years = (result.pricing.years || []).slice(0, COMPARISON_YEAR_COUNT);
     if (scenario.pricing_mode === 'manual' && result.pricing.amount !== null) {
@@ -804,10 +804,23 @@
     chart.append(plot);
     const legend = element('p', undefined, 'comparison-price-legend');
     if (result.total_cost === null) legend.append(element('span', '약가 · 원가 미완성', 'comparison-unknown-key'));
-    else legend.append(element('span', '약가 차액', 'comparison-price-key'));
+    else {
+      const phases = new Map();
+      for (const year of years) {
+        const phase = year.assumption ? 'extension' : year.kind === 'bonus' ? 'bonus' : 'base';
+        if (!phases.has(phase)) phases.set(phase, []);
+        phases.get(phase).push(year.year);
+      }
+      for (const [phase, phaseYears] of phases) {
+        const first = phaseYears[0], last = phaseYears[phaseYears.length - 1];
+        const period = (phaseYears.every((year, index) => year === first + index) ? first + (last === first ? '' : '~' + last) : phaseYears.join('·')) + '년';
+        const key = element('span', '약가 차액' + (phases.size > 1 ? ' (' + period + ')' : ''), 'comparison-price-key' + (phase === 'base' ? '' : ' ' + phase));
+        key.dataset.pricePhase = phase;
+        legend.append(key);
+      }
+    }
     legend.append(element('span', '제조원가 ' + format(result.total_cost, 1) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-cost-key'));
     if (result.total_cost !== null && years.some(year => result.total_cost.gt(year.amount))) legend.append(element('span', '원가 초과', 'comparison-excess-key'));
-    if (result.pricing.model === 'simplified-v1') legend.append(element('span', '간편 가정'));
     chart.append(legend);
     return chart;
   }
