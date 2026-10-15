@@ -163,12 +163,16 @@
     $('scenario-tabs').replaceChildren();
     for (const [index, s] of project.scenarios.entries()) {
       const selected = s.id === project.active_scenario_id;
-      const label = (index + 1) + '. ' + s.name;
-      const button = element('button', label, 'scenario-tab' + (selected ? ' active' : ''));
+      const number = String(index + 1).padStart(2, '0');
+      const button = element('button', undefined, 'scenario-tab' + (selected ? ' active' : ''));
+      const badge = element('span', number, 'tab-number scenario-number');
+      badge.setAttribute('aria-hidden', 'true');
+      button.append(badge, element('span', s.name, 'scenario-name'));
       button.type = 'button'; button.dataset.scenarioId = s.id;
       button.setAttribute('role', 'tab'); button.setAttribute('aria-selected', String(selected));
+      button.setAttribute('aria-label', (index + 1) + '번 시나리오: ' + s.name);
       button.tabIndex = selected ? 0 : -1;
-      button.title = label;
+      button.title = number + '. ' + s.name;
       button.addEventListener('click', () => activateScenario(s.id));
       $('scenario-tabs').append(button);
     }
