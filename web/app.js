@@ -328,8 +328,8 @@
       input.disabled = !automatic || parentUnmet || Boolean(hidden && document.querySelector('.pricing-card').contains(hidden));
     });
     const scheduleNotes = {
-      data_submission: '1년차 70% → 2~4년차 60%', improved: '1년차 70%',
-      improved_combo: '1년차 68%', other: '1~4년차 60%', biologic: '1~5년차 80%'
+      data_submission: '1년차 70% → 2~4년차 60%', improved: '1~4년차 70%',
+      improved_combo: '1~4년차 68%', other: '1~4년차 60%', biologic: '1~5년차 80%'
     };
     $('pricing-general-input-note').textContent = p.supply_category !== 'none'
       ? '수급안정 선택 중에는 일반가산 일정을 적용하지 않습니다.' : scheduleNotes[p.general_category] || '';
@@ -566,6 +566,13 @@
     const results = project.scenarios.map(s => E.calculate(Object.assign({}, s, {
       pricing_conditions: Object.assign({}, s.pricing_conditions, {selected_year: comparisonYears.get(s.id) || 1})
     })));
+    let comparisonMaximum = new D(0);
+    for (const result of results) {
+      const amounts = (result.pricing.years || []).map(year => year.amount);
+      amounts.push(result.pricing.amount, result.total_cost);
+      for (const amount of amounts) if (amount !== null && amount !== undefined && amount.gt(comparisonMaximum)) comparisonMaximum = amount;
+    }
+    const comparisonScale = comparisonMaximum.gt(0) ? comparisonMaximum.mul('1.1') : new D(1);
     const apiDetails = (s, value) => {
       const list = element('div', undefined, 'comparison-api-list');
       for (const material of s.materials.filter(m => m.kind === 'api')) {
@@ -590,10 +597,11 @@
         chart.dataset.scenarioId = s.id;
         chart.append(document.querySelector('.composition-card .composition-charts').cloneNode(true), document.querySelector('.composition-card .composition-status').cloneNode(true));
         chart.querySelectorAll('[id]').forEach(node => node.removeAttribute('id'));
+        chart.querySelector('.donut-column').prepend(element('span', (comparisonYears.get(s.id) || 1) + '년차', 'comparison-donut-year'));
         renderComposition(r, chart);
         return chart;
       }],
-      ['price_forecast', '연차별 약가 · 제조원가', (s, r) => renderComparisonPrices(s, r)],
+      ['price_forecast', '연차별 약가 · 제조원가', (s, r) => renderComparisonPrices(s, r, comparisonScale)],
       ['api_cost', 'API 비용', (s, r) => [r.api_batch, r.api_unit]],
       ['excipient_cost', '부형제 비용', (s, r) => [r.excipient_batch, r.excipient_unit]],
       ['packaging_cost', '포자재비', (s, r) => [s.batch_packaging, r.packaging_unit]],
@@ -625,12 +633,13 @@
       $('comparison-body').append(tr);
     }
   }
-  function renderComparisonPrices(scenario, result) {
+  function renderComparisonPrices(scenario, result, scale) {
     const chart = element('div', undefined, 'comparison-price-chart');
     chart.dataset.scenarioId = scenario.id;
+    chart.dataset.scaleMaximum = scale.toString();
     const selected = comparisonYears.get(scenario.id) || 1;
     const heading = element('div', undefined, 'comparison-price-heading');
-    heading.append(element('strong', selected + '년차 기준'), element('span', result.pricing.model === 'simplified-v1' ? '간편 · 원/T' : '원/T'));
+    heading.append(element('strong', selected + '년차 기준'), element('span', '공통 축 0~' + format(scale) + ' 원/T', 'comparison-price-scale'));
     chart.append(heading);
     let years = result.pricing.years || [];
     if (scenario.pricing_mode === 'manual' && result.pricing.amount !== null) {
@@ -638,14 +647,11 @@
     }
     if (years.length !== 10) {
       chart.append(element('p', '약가 조건을 입력하면 10년 약가를 표시합니다.', 'comparison-price-message'));
-      chart.append(element('p', '제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-price-legend'));
+      const legend = element('p', undefined, 'comparison-price-legend');
+      legend.append(element('span', '제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-cost-key'));
+      chart.append(legend);
       return chart;
     }
-    let maximum = new D(0);
-    years.forEach(year => { if (year.amount.gt(maximum)) maximum = year.amount; });
-    if (result.total_cost !== null && result.total_cost.gt(maximum)) maximum = result.total_cost;
-    const scale = maximum.gt(0) ? maximum.mul('1.1') : new D(1);
-    chart.dataset.scaleMaximum = scale.toString();
     const plot = element('div', undefined, 'comparison-price-plot');
     const bars = element('div', undefined, 'comparison-price-bars');
     for (const year of years) {
@@ -662,6 +668,12 @@
       const fill = element('span', undefined, 'comparison-price-fill');
       fill.style.height = year.amount.div(scale).mul(100).toNumber() + '%';
       fill.setAttribute('aria-hidden', 'true'); column.append(fill);
+      if (result.total_cost !== null) {
+        const costFill = element('span', undefined, 'comparison-cost-fill');
+        costFill.dataset.cost = result.total_cost.toString();
+        costFill.style.height = result.total_cost.div(scale).mul(100).toNumber() + '%';
+        costFill.setAttribute('aria-hidden', 'true'); column.append(costFill);
+      }
       button.append(column, element('span', String(year.year), 'comparison-price-label'));
       button.addEventListener('click', () => {
         comparisonYears.set(scenario.id, year.year);
@@ -672,15 +684,9 @@
       bars.append(button);
     }
     plot.append(bars);
-    if (result.total_cost !== null) {
-      const line = element('span', undefined, 'comparison-cost-line');
-      line.dataset.cost = result.total_cost.toString();
-      line.style.bottom = result.total_cost.div(scale).mul(100).toNumber() + '%';
-      line.title = '제조원가 ' + format(result.total_cost) + ' 원/T';
-      line.setAttribute('aria-hidden', 'true'); plot.append(line);
-    }
     chart.append(plot);
-    const legend = element('p', '1~10년차 · 제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-price-legend');
+    const legend = element('p', undefined, 'comparison-price-legend');
+    legend.append(element('span', (result.pricing.model === 'simplified-v1' ? '간편 약가' : '약가') + ' · 1~10년차', 'comparison-price-key'), element('span', '제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-cost-key'));
     chart.append(legend);
     return chart;
   }

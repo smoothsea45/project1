@@ -275,7 +275,9 @@
 .pricing-simple-note{margin-top:10px;padding:7px 9px;border-radius:5px;background:#eaf5f3;color:var(--teal-dark);font-size:10px;line-height:1.6}
 .pricing-card .pricing-condition-details .help-text{margin-top:0}
 
-/* 비교표의 약가 막대와 제조원가 기준선은 같은 세로축을 공유합니다. */
+/* 비교표의 약가와 제조원가는 같은 세로축의 겹친 막대로 보여줍니다. */
+.comparison-composition .donut-column{position:relative}
+.comparison-donut-year{position:absolute;top:0;left:0;z-index:1;display:inline-flex;align-items:center;padding:3px 7px;border:1px solid #d5e2e7;border-radius:5px;background:#f2f7f9;color:var(--ink-soft);font-size:10px;line-height:1.4;font-weight:600;white-space:nowrap}
 .comparison-table td:has(.comparison-price-chart){padding:10px 12px;vertical-align:top;white-space:normal;text-align:left}
 .comparison-price-chart{width:100%;min-width:0;font-weight:400;font-variant-numeric:tabular-nums}
 .comparison-price-heading{display:flex;align-items:baseline;justify-content:space-between;gap:5px;min-height:16px;font-size:10px;line-height:1.5;color:var(--ink-soft);white-space:normal}
@@ -286,14 +288,18 @@
 .comparison-price-year:hover{background:#118b8710}
 .comparison-price-year[aria-pressed=true],.comparison-price-year.selected{background:#118b8714;box-shadow:inset 0 0 0 1px #118b8770}
 .comparison-price-year:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
-.comparison-price-column{display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-width:0}
+.comparison-price-column{position:relative;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-width:0}
 .comparison-price-fill{display:block;width:min(19px,100%);min-height:0;background:#7f94b7;border-radius:3px 3px 0 0}
+.comparison-cost-fill{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:block;width:min(8px,50%);min-height:0;z-index:1;background:#bd7952;border-radius:2px 2px 0 0;pointer-events:none}
 .comparison-price-year.bonus .comparison-price-fill{background:var(--teal)}
 .comparison-price-year.extension .comparison-price-fill{background:#66afa5}
 .comparison-price-label{position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);font-size:9px;line-height:14px;white-space:nowrap}
-.comparison-cost-line{position:absolute;left:0;right:0;height:0;border-top:2px solid #bd7952;z-index:2;pointer-events:none}
-.comparison-price-legend{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:4px;font-size:10px;line-height:1.5;color:var(--ink-soft);overflow-wrap:anywhere}
-.comparison-price-legend::before{content:"";display:block;width:18px;height:0;border-top:2px solid #bd7952;flex-shrink:0}
+.comparison-price-legend{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:3px 9px;margin-top:4px;font-size:10px;line-height:1.5;color:var(--ink-soft);overflow-wrap:anywhere}
+.comparison-price-key,.comparison-cost-key{display:inline-flex;align-items:center;gap:4px;white-space:nowrap}
+.comparison-price-key::before,.comparison-cost-key::before{content:"";display:block;width:7px;height:9px;border-radius:2px 2px 0 0;background:#7f94b7;flex-shrink:0}
+.comparison-price-key.bonus::before{background:var(--teal)}
+.comparison-price-key.extension::before{background:#66afa5}
+.comparison-cost-key::before{width:5px;background:#bd7952}
 .comparison-price-message,.comparison-price-unavailable{padding:8px 0;font-size:10px;line-height:1.6;color:var(--muted);white-space:normal}
 @media(max-width:1180px){
   .pricing-card .pricing-layout{grid-template-columns:minmax(0,1fr) minmax(210px,.3fr);gap:14px}
@@ -359,7 +365,7 @@
   .comparison-table tbody{display:table-row-group}
   .comparison-table col{width:auto!important}
   .comparison-table col:first-child{width:108px!important}
-  .comparison-table th,.comparison-table td,.comparison-table tbody th,.comparison-table tbody td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:2px 5px;font-size:10px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+  .comparison-table th,.comparison-table td,.comparison-table tbody th,.comparison-table tbody td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:1.5px 5px;font-size:10px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
   .comparison-table th.row-label,.comparison-table td.row-label{width:108px!important;min-width:0!important;font-size:10px}
   .comparison-table thead th:not(.row-label){font-size:12px;line-height:1.2;padding:2px 5px}
   .comparison-table .comparison-unit-header th{background:#f0f5f6;font-size:9px;padding:2px 5px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -373,15 +379,15 @@
   .comparison-composition .composition-charts{grid-template-columns:1fr;gap:4px;padding:0;align-items:start}
   .comparison-composition .composition-donut-wrap{width:72px;height:72px}
   .comparison-composition .donut-center{inset:15px;gap:1px}
-  .comparison-composition .donut-center strong{font-size:14px!important;letter-spacing:-.5px}
+  .comparison-composition .donut-center strong{font-size:14px!important;letter-spacing:-.5px;white-space:nowrap}
   .comparison-composition .donut-center-label{font-size:8px}
-  .comparison-composition .donut-total{font-size:8px;line-height:1.25}
+  .comparison-composition .donut-total{font-size:8px;line-height:1.25;white-space:nowrap}
   .comparison-composition .donut-note{font-size:9px;line-height:1.3;margin-top:2px}
   .comparison-composition .composition-remainder-note{font-size:8px;line-height:1.3;gap:2px;margin-top:2px}
   .comparison-composition .composition-subheading{font-size:10px}
   .comparison-composition .composition-denominator{font-size:9px;margin-top:1px}
-  .comparison-composition .stack-detail{grid-template-columns:17px minmax(0,1fr);gap:6px;margin-top:4px;min-height:75px}
-  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:75px}
+  .comparison-composition .stack-detail{grid-template-columns:17px minmax(0,1fr);gap:6px;margin-top:4px;min-height:60px}
+  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:60px}
   .comparison-composition .composition-stack{border-radius:3px}
   .comparison-composition .composition-row{grid-template-columns:minmax(0,88px) minmax(0,1fr);gap:5px;font-size:9px;line-height:1.25}
   .comparison-composition .composition-label{gap:3px;flex-wrap:nowrap}
@@ -390,18 +396,21 @@
   .comparison-composition .raw-material-summary{grid-template-columns:minmax(0,111px) minmax(0,1fr);gap:5px;margin-top:3px;padding-top:4px;font-size:9px;line-height:1.3}
   .comparison-composition .raw-material-total{font-size:9px}
   .comparison-composition .composition-status{font-size:8px;line-height:1.3;margin:0}
+  .comparison-donut-year{padding:1px 4px;border-radius:3px;font-size:8px;line-height:1.3}
   .comparison-table tr:has(.comparison-price-chart){break-inside:avoid;page-break-inside:avoid}
   .comparison-table td:has(.comparison-price-chart){padding:3px 5px!important;vertical-align:top}
   .comparison-price-heading{min-height:11px;font-size:8px;line-height:1.3;gap:3px}
-  .comparison-price-plot{height:48px;margin:3px 0 13px;border-bottom-width:1px}
+  .comparison-price-plot{height:40px;margin:3px 0 13px;border-bottom-width:1px}
   .comparison-price-bars{gap:2px}
   .comparison-price-year{padding:0 1px;border-radius:2px 2px 0 0}
   .comparison-price-fill{width:min(14px,100%);border-radius:2px 2px 0 0}
+  .comparison-cost-fill{width:min(6px,50%);border-radius:1px 1px 0 0}
   .comparison-price-label{bottom:-12px;font-size:7px;line-height:10px}
-  .comparison-cost-line{border-top-width:1.5px}
-  .comparison-price-legend{margin-top:2px;font-size:8px;line-height:1.3;gap:4px}
-  .comparison-price-legend::before{width:12px;border-top-width:1.5px}
+  .comparison-price-legend{margin-top:2px;font-size:8px;line-height:1.3;gap:2px 7px}
+  .comparison-price-key,.comparison-cost-key{gap:3px}
+  .comparison-price-key::before,.comparison-cost-key::before{width:5px;height:7px;border-radius:1px 1px 0 0}
+  .comparison-cost-key::before{width:4px}
   .comparison-price-message,.comparison-price-unavailable{padding:4px 0;font-size:8px;line-height:1.3}
-  .comparison-price-chart,.comparison-price-fill,.comparison-cost-line,.comparison-price-legend{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+  .comparison-price-chart,.comparison-price-fill,.comparison-cost-fill,.comparison-price-legend,.comparison-price-key,.comparison-cost-key,.comparison-donut-year{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .comparison-composition,.composition-donut,.composition-stack,.legend-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }

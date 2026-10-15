@@ -258,8 +258,8 @@ for (const listingDate of ['', '2027-02-29', '2027-13-01', '2027-00-01', '2027-0
 
 const simpleGeneralCases = [
   ['data_submission', ['700', ...repeated(600, 3), ...repeated(450, 6)]],
-  ['improved', ['700', ...repeated(450, 9)]],
-  ['improved_combo', ['680', ...repeated(450, 9)]],
+  ['improved', [...repeated(700, 4), ...repeated(450, 6)]],
+  ['improved_combo', [...repeated(680, 4), ...repeated(450, 6)]],
   ['other', [...repeated(600, 4), ...repeated(450, 6)]],
   ['biologic', [...repeated(800, 5), ...repeated(700, 5)]]
 ];
@@ -302,11 +302,18 @@ for (const [category, expected] of simpleGeneralCases) {
 }
 
 for (const category of ['data_submission', 'improved', 'improved_combo', 'other']) {
-  test(`simplified ${category} ends at the basic rate for one or zero criteria`, () => {
+  test(`simplified ${category} recovers from the fifth year at the basic rate for one or zero criteria`, () => {
     const one = E.assessPricing(scenario({}, { general_category: category, own_data: false }));
     const none = E.assessPricing(scenario({}, { general_category: category, own_data: false, dmf: false }));
+    equal(one.years[4].amount, 360);
+    equal(none.years[4].amount, 290);
     equal(one.years[9].amount, 360);
     equal(none.years[9].amount, 290);
+    if (category === 'improved' || category === 'improved_combo') {
+      const fourthYearPrice = category === 'improved' ? 700 : 680;
+      equal(one.years[3].amount, fourthYearPrice);
+      equal(none.years[3].amount, fourthYearPrice);
+    }
   });
 }
 
@@ -355,7 +362,7 @@ test('malformed preserved detailed flags cannot block a simplified calculation',
     general_long_extension: [], company_eligible: 'false',
     supply_eligible: 'false', supply_detail_eligible: null, supply_extension: 'false'
   });
-  assert.deepEqual(amounts(data), ['700', ...repeated(450, 9)]);
+  assert.deepEqual(amounts(data), [...repeated(700, 4), ...repeated(450, 6)]);
   data.pricing_conditions.supply_category = 'own_injectable_pediatric';
   assert.deepEqual(amounts(data), repeated(680));
 });

@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=14">
+  <link rel="stylesheet" href="styles.css?v=15">
   <script defer src="vendor/decimal.js"></script>
-  <script defer src="pricing.js?v=2"></script>
+  <script defer src="pricing.js?v=3"></script>
   <script defer src="engine.js?v=9"></script>
-  <script defer src="app.js?v=14"></script>
+  <script defer src="app.js?v=15"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -72,8 +72,8 @@
                 <fieldset class="drug-subgroup"><legend>약제별 가산 · 일반 <span class="selection-note">하나 선택</span></legend>
                   <label class="choice"><input type="radio" name="general-category" value="none" data-pricing-field="general_category" data-pricing-automatic><span>해당 없음 · 일반 제네릭</span></label>
                   <label class="choice"><input type="radio" name="general-category" value="data_submission" data-pricing-field="general_category" data-pricing-automatic><span>자료제출의약품<small class="pricing-choice-schedule">70% 1년 → 60% 3년</small></span></label>
-                  <label class="choice"><input type="radio" name="general-category" value="improved" data-pricing-field="general_category" data-pricing-automatic><span>개량신약<small class="pricing-choice-schedule">70% 1년</small></span></label>
-                  <label class="choice"><input type="radio" name="general-category" value="improved_combo" data-pricing-field="general_category" data-pricing-automatic><span>개량신약복합제<small class="pricing-choice-schedule">68% 1년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="improved" data-pricing-field="general_category" data-pricing-automatic><span>개량신약<small class="pricing-choice-schedule">70% 1년 + 3년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="improved_combo" data-pricing-field="general_category" data-pricing-automatic><span>개량신약복합제<small class="pricing-choice-schedule">68% 1년 + 3년</small></span></label>
                   <label class="choice"><input type="radio" name="general-category" value="other" data-pricing-field="general_category" data-pricing-automatic><span>기타<small class="pricing-choice-schedule">60% 1년 + 3년</small></span></label>
                   <label class="choice"><input type="radio" name="general-category" value="biologic" data-pricing-field="general_category" data-pricing-automatic><span>생물의약품<small class="pricing-choice-schedule">80% 1년 + 4년</small></span></label>
                 </fieldset>

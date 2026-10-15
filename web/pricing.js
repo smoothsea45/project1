@@ -42,8 +42,8 @@
   // These are user-requested modelling assumptions, not verified legal benefit schedules.
   const SIMPLIFIED_SCHEDULES = Object.freeze({
     data_submission: Object.freeze({ label: '자료제출의약품', periods: [[1, 1, '0.70'], [2, 4, '0.60']] }),
-    improved: Object.freeze({ label: '개량신약', periods: [[1, 1, '0.70']] }),
-    improved_combo: Object.freeze({ label: '개량신약복합제', periods: [[1, 1, '0.68']] }),
+    improved: Object.freeze({ label: '개량신약', periods: [[1, 4, '0.70']] }),
+    improved_combo: Object.freeze({ label: '개량신약복합제', periods: [[1, 4, '0.68']] }),
     other: Object.freeze({ label: '기타', periods: [[1, 4, '0.60']] }),
     biologic: Object.freeze({ label: '생물의약품', periods: [[1, 5, '0.80']] })
   });
