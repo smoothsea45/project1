@@ -33,7 +33,8 @@ function amounts(data) {
 function repeated(amount, length = 10) { return Array(length).fill(String(amount)); }
 
 // The requested examples all use an original basis of 1,000 KRW and listing on
-// 2027-09-01; eligibility is explicit rather than inferred from company labels.
+// 2027-09-01. The generic branch keeps its prior company/market rules; supply
+// categories now deliberately use the separately labelled simplified model.
 const examples = [
   ['two criteria, no addition, fewer than 14', {}, {}, repeated(450)],
   ['one criterion, no addition, fewer than 14', {}, { own_data: false }, repeated(360)],
@@ -43,8 +44,8 @@ const examples = [
   ['innovative domestic extension lasts four years', { company_type: 'innovative' }, { company_eligible: true, domestic_extension: true }, [...repeated(600, 4), ...repeated(450, 6)]],
   ['innovative four-year extension defers 14-item reduction', { company_type: 'innovative', identical_count_band: 'ge14' }, { company_eligible: true, domestic_extension: true }, [...repeated(600, 4), ...repeated(383, 6)]],
   ['near innovative domestic extension lasts four years', { company_type: 'near' }, { company_eligible: true, domestic_extension: true }, [...repeated(500, 4), ...repeated(450, 6)]],
-  ['supply addition lasts five years without extension', {}, { supply_category: 'api_self', supply_eligible: true }, [...repeated(680, 5), ...repeated(450, 5)]],
-  ['supply addition defers 14-item reduction until year six', { identical_count_band: 'ge14' }, { supply_category: 'api_self', supply_eligible: true }, [...repeated(680, 5), ...repeated(383, 5)]],
+  ['simple supply assumes the initial five years and a further five-year extension', {}, { supply_category: 'api_self', supply_eligible: false }, repeated(680)],
+  ['simple supply retains 68 percent irrespective of the generic 14-item band', { identical_count_band: 'ge14' }, { supply_category: 'api_self', supply_eligible: true }, repeated(680)],
   ['supply extension retains addition throughout ten years', {}, { supply_category: 'api_self', supply_eligible: true, supply_extension: true }, repeated(680)]
 ];
 
@@ -140,12 +141,12 @@ test('string false is never treated as a qualifying boolean', () => {
   assert.ok(result.issues.length > 0);
 });
 
-test('supply addition has precedence without adding or concatenating company periods', () => {
+test('simple supply has precedence without adding or concatenating company periods', () => {
   const data = scenario({ company_type: 'innovative', identical_count_band: 'ge14' }, {
     company_eligible: true, domestic_extension: true,
     supply_category: 'api_self', supply_eligible: true, supply_extension: false
   });
-  assert.deepEqual(amounts(data), [...repeated(680, 5), ...repeated(383, 5)]);
+  assert.deepEqual(amounts(data), repeated(680));
 });
 
 test('inactive supply extension values do not extend a company addition', () => {
@@ -156,52 +157,34 @@ test('inactive supply extension values do not extend a company addition', () => 
   assert.deepEqual(amounts(data), ['600', ...repeated(450, 9)]);
 });
 
-test('supply addition requires its own eligibility rather than the 14-item selection', () => {
-  const data = scenario({}, { supply_category: 'api_self', supply_eligible: false });
-  assert.deepEqual(amounts(data), repeated(450));
-});
-
-test('ordinary supply selection cannot bypass an unfulfilled basic criterion', () => {
-  const data = scenario({}, { own_data: false, supply_category: 'api_self', supply_eligible: true });
-  assert.deepEqual(amounts(data), repeated(360));
-});
-
-test('ineligible supply selection leaves a separately eligible company addition available', () => {
+test('simple supply ignores preserved old eligibility and extension controls', () => {
   const data = scenario({ company_type: 'innovative' }, {
     company_eligible: true, supply_category: 'api_self', supply_eligible: false,
-    supply_extension: true
+    supply_extension: false, own_data: false, dmf: false
   });
-  assert.deepEqual(amounts(data), ['600', ...repeated(450, 9)]);
+  assert.deepEqual(amounts(data), repeated(680));
+  assert.equal(data.pricing_conditions.supply_eligible, false);
+  assert.equal(data.pricing_conditions.supply_extension, false);
 });
 
-test('directly produced injection and pediatric supply requires separate detail eligibility', () => {
-  const data = scenario({}, { supply_category: 'own_injectable_pediatric', supply_eligible: true, supply_detail_eligible: false });
-  assert.deepEqual(amounts(data), repeated(450));
-  data.pricing_conditions.supply_detail_eligible = true;
-  assert.deepEqual(amounts(data), [...repeated(680, 5), ...repeated(450, 5)]);
-});
-
-test('eligible domestic essential medicines deem basic criteria satisfied with an explanation', () => {
-  const data = scenario({}, { own_data: false, dmf: false, supply_category: 'domestic_essential', supply_eligible: true });
-  const pricing = E.assessPricing(data);
-  assert.deepEqual(amounts(data), [...repeated(680, 5), ...repeated(450, 5)]);
-  assert.equal(pricing.effective_requirements.count, 2);
-  assert.equal(pricing.effective_requirements.own_data, true);
-  assert.equal(pricing.effective_requirements.dmf, true);
-  assert.ok(pricing.effective_requirements.deemed_reasons.length > 0);
-  assert.equal(data.pricing_conditions.own_data, false);
-  assert.equal(data.pricing_conditions.dmf, false);
-});
-
-test('domestic essential selection without eligibility does not deem basic criteria', () => {
-  const data = scenario({}, { own_data: false, dmf: false, supply_category: 'domestic_essential', supply_eligible: false });
-  const pricing = E.assessPricing(data);
-  assert.deepEqual(amounts(data), repeated(290));
-  assert.equal(pricing.effective_requirements.count, 0);
-});
+for (const category of ['api_self', 'domestic_essential', 'own_injectable_pediatric']) {
+  test(`simple supply ${category} uses 68 percent even when legacy qualification fields are false`, () => {
+    const data = scenario({}, {
+      own_data: false, dmf: false, supply_category: category,
+      supply_eligible: false, supply_detail_eligible: false, supply_extension: false
+    });
+    assert.deepEqual(amounts(data), repeated(680));
+    const result = E.assessPricing(data);
+    assert.equal(result.model, 'simplified-v1');
+    assert.match(result.source, /간편.*가정/);
+    assert.equal(result.regulation, null);
+    assert.equal(data.pricing_conditions.own_data, false);
+    assert.equal(data.pricing_conditions.dmf, false);
+  });
+}
 
 test('supply extension years are explicitly distinguished as an assumption', () => {
-  const pricing = E.assessPricing(scenario({}, { supply_category: 'api_self', supply_eligible: true, supply_extension: true }));
+  const pricing = E.assessPricing(scenario({}, { supply_category: 'api_self', supply_eligible: false, supply_extension: false }));
   assert.ok(pricing.years.slice(0, 5).every(year => !year.assumption));
   assert.ok(pricing.years.slice(5).every(year => year.assumption));
 });
@@ -273,90 +256,131 @@ for (const listingDate of ['', '2027-02-29', '2027-13-01', '2027-00-01', '2027-0
   });
 }
 
-for (const category of ['data_submission', 'improved', 'biologic']) {
-  test(`general ${category} without its separate basis cannot fall back to generic 45 percent`, () => {
-    const data = scenario({}, { general_category: category });
-    const result = E.calculate(data);
-    equal(result.total_cost, 20);
-    assert.equal(result.pricing.status, 'needs_conditions');
-    assert.equal(result.pricing.amount, null);
-    assert.equal(result.cost_rate, null);
-    assert.equal(result.pricing.years.length, 0);
-    assert.match(result.issues.map(issue => issue.message).join(' '), /추가 산정조건 필요/);
+const simpleGeneralCases = [
+  ['data_submission', ['700', ...repeated(600, 3), ...repeated(450, 6)]],
+  ['improved', ['700', ...repeated(450, 9)]],
+  ['improved_combo', ['680', ...repeated(450, 9)]],
+  ['other', [...repeated(600, 4), ...repeated(450, 6)]],
+  ['biologic', [...repeated(800, 5), ...repeated(700, 5)]]
+];
+
+for (const [category, expected] of simpleGeneralCases) {
+  test(`simplified general ${category} uses its explicit ten-year schedule`, () => {
+    assert.deepEqual(amounts(scenario({}, { general_category: category })), expected);
+  });
+
+  test(`simplified ${category} is labelled as an assumption rather than an official calculation`, () => {
+    const result = E.assessPricing(scenario({}, { general_category: category }));
+    assert.equal(result.model, 'simplified-v1');
+    assert.match(result.source, /간편.*가정/);
+    assert.equal(result.regulation, null);
+    assert.equal(result.basis_date, null);
+    assert.deepEqual(result.links, []);
+  });
+
+  test(`simplified ${category} ignores preserved hidden detailed conditions`, () => {
+    const data = scenario({ company_type: '', identical_count_band: '' }, {
+      general_category: category, general_subtype: '', general_base: 'not a number',
+      general_cap: '-100', general_recognized: false, general_extension: false,
+      general_same_reference: false, general_first_listed: false,
+      general_dose_equivalent: false, general_trigger_date: 'invalid date',
+      general_target_biologic: true, general_reference_own: true,
+      general_long_extension: true, company_eligible: false
+    });
+    const before = JSON.stringify(data);
+    assert.deepEqual(amounts(data), expected);
+    assert.equal(JSON.stringify(data), before);
+  });
+
+  test(`simple supply takes precedence over ${category} without summing rates`, () => {
+    const data = scenario({ company_type: 'innovative', identical_count_band: 'ge14' }, {
+      general_category: category, supply_category: 'api_self',
+      supply_eligible: false, supply_extension: false, company_eligible: true
+    });
+    assert.deepEqual(amounts(data), repeated(680));
   });
 }
 
-function generalScenario(fields = {}, conditions = {}) {
-  return scenario(fields, {
-    general_category: 'data_submission', general_subtype: 'new_form',
-    general_base: '1000', general_same_reference: true,
-    general_first_listed: true, general_dose_equivalent: true,
-    general_trigger_date: '2027-09-01', ...conditions
+for (const category of ['data_submission', 'improved', 'improved_combo', 'other']) {
+  test(`simplified ${category} ends at the basic rate for one or zero criteria`, () => {
+    const one = E.assessPricing(scenario({}, { general_category: category, own_data: false }));
+    const none = E.assessPricing(scenario({}, { general_category: category, own_data: false, dmf: false }));
+    equal(one.years[9].amount, 360);
+    equal(none.years[9].amount, 290);
   });
 }
 
-test('verified first-listed data-submission route applies 70/45 to its own 1000 basis', () => {
-  const data = generalScenario({ original_price: '2000', identical_count_band: 'ge14' });
-  const result = E.assessPricing(data);
-  equal(result.base_amount, 1000);
-  equal(result.bonus_amount, 1556);
-  assert.deepEqual(amounts(data), ['1556', ...repeated(1000, 9)]);
+test('biologic post-addition rate remains 70 percent irrespective of generic criteria', () => {
+  assert.deepEqual(amounts(scenario({}, { general_category: 'biologic', own_data: false, dmf: false })), [...repeated(800, 5), ...repeated(700, 5)]);
 });
 
-test('non-improved data-submission extension recalculates 60/45 and honors the prior ceiling', () => {
-  const data = generalScenario({}, { general_extension: true, general_cap: '1300' });
-  // Year one: round(1000 × 70/45) = 1556.
-  // Years two through four: min(round(1000 × 60/45), 1300) = 1300.
-  assert.deepEqual(amounts(data), ['1556', ...repeated(1300, 3), ...repeated(1000, 6)]);
+for (const field of ['own_data', 'dmf']) {
+  test(`a malformed active recovery criterion ${field} cannot silently change the post-addition price`, () => {
+    const result = E.assessPricing(scenario({}, { general_category: 'data_submission', [field]: 'false' }));
+    assert.equal(result.status, 'invalid');
+    assert.equal(result.amount, null);
+    assert.equal(result.years.length, 0);
+  });
+}
+
+test('simplified percentages use the original price directly and round monetary results half up', () => {
+  const data = scenario({ original_price: '1003' }, { general_category: 'data_submission' });
+  assert.deepEqual(amounts(data), ['702', ...repeated(602, 3), ...repeated(451, 6)]);
+  assert.deepEqual(amounts(scenario({ original_price: '1003' }, { supply_category: 'api_self' })), repeated(682));
 });
 
-test('non-improved extension without the required prior ceiling asks for conditions', () => {
-  const result = E.assessPricing(generalScenario({}, { general_extension: true, general_cap: null }));
-  assert.equal(result.status, 'needs_conditions');
-  assert.equal(result.amount, null);
-  assert.equal(result.years.length, 0);
+test('generic 14-item reduction cannot leak into a simplified general schedule', () => {
+  for (const [category] of simpleGeneralCases) {
+    const below14 = scenario({ identical_count_band: 'lt14' }, { general_category: category });
+    const atLeast14 = scenario({ identical_count_band: 'ge14' }, { general_category: category });
+    assert.deepEqual(amounts(atLeast14), amounts(below14));
+  }
 });
 
-test('recognized improved medicine retains the 70/45 amount during its initial extension', () => {
-  const data = generalScenario({}, { general_category: 'improved', general_recognized: true, general_extension: true });
-  assert.deepEqual(amounts(data), [...repeated(1556, 4), ...repeated(1000, 6)]);
+test('company eligibility and old extension choices do not alter the simplified general schedule', () => {
+  for (const [category, expected] of simpleGeneralCases) {
+    const data = scenario({ company_type: 'innovative' }, {
+      general_category: category, company_eligible: true, domestic_extension: true,
+      general_extension: true, general_long_extension: true
+    });
+    assert.deepEqual(amounts(data), expected);
+  }
 });
 
-test('turning off general extension ignores the preserved hidden long-extension selection', () => {
-  const data = generalScenario({}, { general_category: 'improved', general_recognized: true, general_extension: true, general_long_extension: true });
-  assert.deepEqual(amounts(data), repeated(1556, 10));
-  data.pricing_conditions.general_extension = false;
-  assert.deepEqual(amounts(data), ['1556', ...repeated(1000, 9)]);
-  assert.equal(data.pricing_conditions.general_long_extension, true);
+test('malformed preserved detailed flags cannot block a simplified calculation', () => {
+  const data = scenario({}, { general_category: 'improved' });
+  Object.assign(data.pricing_conditions, {
+    general_recognized: 'false', general_extension: null,
+    general_same_reference: 'old value', general_dose_equivalent: 1,
+    general_long_extension: [], company_eligible: 'false',
+    supply_eligible: 'false', supply_detail_eligible: null, supply_extension: 'false'
+  });
+  assert.deepEqual(amounts(data), ['700', ...repeated(450, 9)]);
+  data.pricing_conditions.supply_category = 'own_injectable_pediatric';
+  assert.deepEqual(amounts(data), repeated(680));
 });
 
-test('generic 14-item reduction cannot leak into the separate general-addition route', () => {
-  const below14 = generalScenario({ identical_count_band: 'lt14' });
-  const atLeast14 = generalScenario({ identical_count_band: 'ge14' });
-  assert.deepEqual(amounts(atLeast14), amounts(below14));
-  assert.equal(E.assessPricing(atLeast14).reduced_amount.toString(), '1000');
-});
-
-test('company identity cannot replace or sum with the general route amount', () => {
-  const data = generalScenario({ company_type: 'innovative' }, { company_eligible: true, domestic_extension: true });
-  assert.deepEqual(amounts(data), ['1556', ...repeated(1000, 9)]);
-});
-
-test('unverified combined general and supply additions require conditions rather than choosing the largest rate', () => {
-  const data = generalScenario({}, { supply_category: 'api_self', supply_eligible: true });
+test('selecting a simplified general year updates the shared cost denominator', () => {
+  const data = scenario({}, { general_category: 'data_submission' });
+  equal(E.calculate(data).pricing.amount, 700);
+  data.pricing_conditions.selected_year = 3;
   const result = E.calculate(data);
-  assert.equal(result.pricing.status, 'needs_conditions');
-  assert.equal(result.pricing.amount, null);
-  assert.equal(result.pricing.years.length, 0);
-  assert.equal(result.cost_rate, null);
+  equal(result.pricing.amount, 600);
+  equal(result.cost_rate, new E.Decimal(20).div(600).times(100));
+  equal(result.total_cost, 20);
+  assert.equal(data.manual_price, '300');
 });
 
-test('a distinct general-addition start date cannot silently be shifted to listing day', () => {
-  const data = generalScenario({}, { general_trigger_date: '2026-09-01' });
-  const result = E.assessPricing(data);
-  assert.equal(result.status, 'needs_conditions');
-  assert.equal(result.amount, null);
-  assert.equal(result.years.length, 0);
+test('simplified general and supply schedules cannot bypass missing or invalid original-price validation', () => {
+  for (const condition of [{ general_category: 'other' }, { supply_category: 'api_self' }]) {
+    for (const original of ['', '0', '-1', 'not a price']) {
+      const result = E.calculate(scenario({ original_price: original }, condition));
+      equal(result.total_cost, 20);
+      assert.equal(result.pricing.amount, null);
+      assert.equal(result.pricing.years.length, 0);
+      assert.equal(result.cost_rate, null);
+    }
+  }
 });
 
 test('automatic calculation is pure and retains official regulation provenance', () => {
@@ -383,6 +407,45 @@ test('JSON version 2 roundtrip retains mode, separate manual price, conditions a
   assert.equal(loaded.scenarios[0].manual_price, '300');
   assert.equal(loaded.scenarios[0].pricing_conditions.selected_year, 7);
   equal(E.calculate(loaded.scenarios[0]).pricing.amount, 680);
+});
+
+for (const category of ['improved_combo', 'other']) {
+  test(`new simplified category ${category} survives saving and loading with the chosen year`, () => {
+    const data = scenario({}, { general_category: category, selected_year: 8 });
+    const project = E.makeProject({ scenarios: [data] });
+    const loaded = E.parseProject(E.serializeProject(project));
+    assert.deepEqual(loaded, project);
+    assert.equal(loaded.scenarios[0].pricing_conditions.general_category, category);
+    assert.equal(loaded.scenarios[0].pricing_conditions.selected_year, 8);
+    equal(E.calculate(loaded.scenarios[0]).pricing.amount, 450);
+    assert.equal(loaded.scenarios[0].manual_price, '300');
+  });
+}
+
+test('a legacy improved combination selection migrates to the separate simplified combination category', () => {
+  const project = E.makeProject({ scenarios: [scenario({}, {
+    general_category: 'improved', general_subtype: 'combination', selected_year: 1
+  })] });
+  delete project.scenarios[0].pricing_conditions.model_id;
+  const originalText = JSON.stringify(project);
+  const loaded = E.parseProject(originalText);
+  assert.equal(JSON.stringify(project), originalText);
+  const conditions = loaded.scenarios[0].pricing_conditions;
+  assert.equal(conditions.general_category, 'improved_combo');
+  assert.equal(conditions.general_subtype, 'combination');
+  assert.equal(conditions.model_id, 'simplified-v1');
+  equal(E.calculate(loaded.scenarios[0]).pricing.amount, 680);
+  assert.equal(loaded.scenarios[0].manual_price, '300');
+  assert.deepEqual(E.parseProject(E.serializeProject(loaded)), loaded);
+});
+
+test('editing a migrated combination to improved medicine stays improved on subsequent load', () => {
+  const data = scenario({}, { general_category: 'improved', general_subtype: 'combination', model_id: 'simplified-v1' });
+  const project = E.makeProject({ scenarios: [data] });
+  const loaded = E.parseProject(E.serializeProject(project));
+  assert.equal(loaded.scenarios[0].pricing_conditions.general_category, 'improved');
+  assert.equal(loaded.scenarios[0].pricing_conditions.general_subtype, 'combination');
+  equal(E.calculate(loaded.scenarios[0]).pricing.amount, 700);
 });
 
 test('scenario clone deeply separates pricing conditions and selected year from its original', () => {

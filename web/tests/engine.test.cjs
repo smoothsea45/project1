@@ -455,13 +455,14 @@ test('unsupported material units cannot silently use another conversion', () => 
   assert.throws(() => E.serializeProject(project), /단가 단위의 선택값/);
 });
 
-test('unsupported general pricing never falls back to generic, original or manual price', () => {
+test('simplified general pricing uses its schedule rather than the preserved manual price', () => {
   const result = E.calculate(scenario({ pricing_mode: 'official', original_price: '600', manual_price: '300', company_type: 'innovative', pricing_flags: ['improved'], pricing_conditions: { listing_date: '2027-09-01', general_category: 'improved' } }));
   equal(result.total_cost, '20');
-  assert.equal(result.pricing.amount, null);
-  assert.equal(result.pricing.status, 'needs_conditions');
-  assert.equal(result.cost_rate, null);
-  assert.equal(result.required_saving, null);
+  equal(result.pricing.amount, '420');
+  assert.equal(result.pricing.status, 'ready');
+  assert.equal(result.pricing.source, '간편 가정 약가');
+  equal(result.cost_rate, new E.Decimal('20').div('420').times(100));
+  equal(result.required_saving, '0');
 });
 
 test('rule extension must be explicitly verified with regulation and basis date', () => {

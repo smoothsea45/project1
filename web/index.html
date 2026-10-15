@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=13">
+  <link rel="stylesheet" href="styles.css?v=14">
   <script defer src="vendor/decimal.js"></script>
-  <script defer src="pricing.js?v=1"></script>
-  <script defer src="engine.js?v=8"></script>
-  <script defer src="app.js?v=13"></script>
+  <script defer src="pricing.js?v=2"></script>
+  <script defer src="engine.js?v=9"></script>
+  <script defer src="app.js?v=14"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -67,13 +67,15 @@
               <label class="choice"><input type="radio" name="company-type" value="supply_leader" data-field="company_type" data-pricing-automatic><span>수급안정 선도기업</span></label>
             </fieldset><div id="pricing-company-details" class="pricing-condition-details" hidden><label class="choice" data-pricing-detail="company_eligible"><input type="checkbox" data-pricing-field="company_eligible" data-pricing-automatic><span>일반 단일제 제네릭 등 기업가산 대상 품목 요건 충족</span></label><label class="choice" data-pricing-detail="domestic_extension"><input type="checkbox" data-pricing-field="domestic_extension" data-pricing-automatic><span>국내생산 연장요건 충족</span></label><p class="help-text">기업 자격과 품목 요건을 함께 판정합니다. 연장 시 총 4년 적용</p></div></section>
             <section class="pricing-information-group drug-group" aria-labelledby="pricing-product-heading"><h3 id="pricing-product-heading">품목정보</h3>
-              <fieldset class="pricing-base-criteria"><legend>기본 산정요건 <span class="selection-note">각각 선택</span></legend><label class="choice"><input type="checkbox" data-pricing-field="own_data" data-pricing-automatic><span>자체 생동성시험·임상시험자료 기준 충족</span></label><label class="choice"><input type="checkbox" data-pricing-field="dmf" data-pricing-automatic><span>DMF 등록 원료 사용 기준 충족</span></label><p class="help-text">법정 면제 또는 충족 간주에 해당하는 경우도 포함합니다.</p></fieldset>
+              <fieldset id="pricing-base-criteria" class="pricing-base-criteria"><legend>기본 산정요건 <span class="selection-note">각각 선택</span></legend><label class="choice"><input type="checkbox" data-pricing-field="own_data" data-pricing-automatic><span>자체 생동성시험·임상시험자료 기준 충족</span></label><label class="choice"><input type="checkbox" data-pricing-field="dmf" data-pricing-automatic><span>DMF 등록 원료 사용 기준 충족</span></label><p class="help-text">법정 면제 또는 충족 간주에 해당하는 경우도 포함합니다.</p></fieldset>
               <div class="drug-subgroups">
                 <fieldset class="drug-subgroup"><legend>약제별 가산 · 일반 <span class="selection-note">하나 선택</span></legend>
                   <label class="choice"><input type="radio" name="general-category" value="none" data-pricing-field="general_category" data-pricing-automatic><span>해당 없음 · 일반 제네릭</span></label>
-                  <label class="choice"><input type="radio" name="general-category" value="data_submission" data-pricing-field="general_category" data-pricing-automatic><span>자료제출의약품</span></label>
-                  <label class="choice"><input type="radio" name="general-category" value="improved" data-pricing-field="general_category" data-pricing-automatic><span>개량신약 / 개량신약복합제</span></label>
-                  <label class="choice"><input type="radio" name="general-category" value="biologic" data-pricing-field="general_category" data-pricing-automatic><span>생물의약품</span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="data_submission" data-pricing-field="general_category" data-pricing-automatic><span>자료제출의약품<small class="pricing-choice-schedule">70% 1년 → 60% 3년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="improved" data-pricing-field="general_category" data-pricing-automatic><span>개량신약<small class="pricing-choice-schedule">70% 1년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="improved_combo" data-pricing-field="general_category" data-pricing-automatic><span>개량신약복합제<small class="pricing-choice-schedule">68% 1년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="other" data-pricing-field="general_category" data-pricing-automatic><span>기타<small class="pricing-choice-schedule">60% 1년 + 3년</small></span></label>
+                  <label class="choice"><input type="radio" name="general-category" value="biologic" data-pricing-field="general_category" data-pricing-automatic><span>생물의약품<small class="pricing-choice-schedule">80% 1년 + 4년</small></span></label>
                 </fieldset>
                 <fieldset class="drug-subgroup supply-group"><legend>약제별 가산 · 수급안정 <span class="selection-note">하나 선택</span></legend>
                   <label class="choice"><input type="radio" name="supply-category" value="none" data-pricing-field="supply_category" data-pricing-automatic><span>해당 없음</span></label>
@@ -82,26 +84,9 @@
                   <label class="choice"><input type="radio" name="supply-category" value="own_injectable_pediatric" data-pricing-field="supply_category" data-pricing-automatic><span>직접 생산 항생주사제 / 소아용의약품</span></label>
                 </fieldset>
               </div>
-              <div id="pricing-supply-details" class="pricing-condition-details" hidden><label class="choice"><input type="checkbox" data-pricing-field="supply_eligible" data-pricing-automatic><span>수급안정 최초 가산요건 충족</span></label><label class="choice"><input type="checkbox" data-pricing-field="supply_extension" data-pricing-automatic><span>5년 후 추가 연장 적용 가정</span></label><p class="help-text">추가 기간은 연장요건을 충족한다고 가정한 예상치입니다.</p><div id="pricing-supply-special" hidden><label class="choice"><input type="checkbox" data-pricing-field="supply_detail_eligible" data-pricing-automatic><span>직접생산·공급회사 수 등 세부요건 충족</span></label></div></div>
-              <div id="pricing-general-details" class="pricing-condition-details" hidden>
-                <div class="pricing-detail-fields">
-                  <div class="field" data-pricing-detail="general_subtype"><label for="general-subtype">세부 산정유형</label><select id="general-subtype" data-pricing-field="general_subtype" data-pricing-automatic><option value="">산정유형 선택</option><option value="salt_isomer">염변경 / 이성체</option><option value="new_form">새로운 제형</option><option value="new_dose">새로운 용법·용량 · 임상적 유용성 개선</option><option value="combination">개량신약복합제</option><option value="biosimilar">생물의약품 · 세부경로 확인 필요</option></select></div>
-                  <div class="field" data-pricing-detail="general_base"><label for="general-base">개발목표제품 상한금액 <span class="label-unit">원/T</span></label><input id="general-base" data-pricing-field="general_base" data-pricing-automatic type="text" inputmode="decimal" placeholder="해당 경로의 비교 기준금액"></div>
-                  <div class="field" data-pricing-detail="general_cap"><label for="general-cap">조정 전 상한금액 <span class="label-unit">원/T</span></label><input id="general-cap" data-pricing-field="general_cap" data-pricing-automatic type="text" inputmode="decimal" placeholder="해당 품목의 조정 전 상한금액"></div>
-                  <div class="field" data-pricing-detail="general_trigger_date"><label for="general-trigger-date">목표제품 약가조정 원인제품 고시일</label><input id="general-trigger-date" data-pricing-field="general_trigger_date" data-pricing-automatic type="date"></div>
-                </div>
-                <div class="pricing-detail-checks">
-                  <label class="choice" data-pricing-detail="general_same_reference"><input type="checkbox" data-pricing-field="general_same_reference" data-pricing-automatic><span>목표제품의 동일제제가 이미 등재됨</span></label>
-                  <label class="choice" data-pricing-detail="general_first_listed"><input type="checkbox" data-pricing-field="general_first_listed" data-pricing-automatic><span>우리 제품이 해당 산정경로의 최초 등재제품</span></label>
-                  <label class="choice" data-pricing-detail="general_dose_equivalent"><input type="checkbox" data-pricing-field="general_dose_equivalent" data-pricing-automatic><span>기준금액의 동등 투약비용 확인</span></label>
-                  <label class="choice" data-pricing-detail="general_target_biologic"><input type="checkbox" data-pricing-field="general_target_biologic" data-pricing-automatic><span>개발목표제품이 생물의약품</span></label>
-                  <label class="choice" data-pricing-detail="general_reference_own"><input type="checkbox" data-pricing-field="general_reference_own" data-pricing-automatic><span>개발목표제품이 자사 제품</span></label>
-                  <label class="choice" data-pricing-detail="general_recognized"><input type="checkbox" data-pricing-field="general_recognized" data-pricing-automatic><span>개량신약 인정</span></label>
-                  <label class="choice" data-pricing-detail="general_extension"><input type="checkbox" data-pricing-field="general_extension" data-pricing-automatic><span>국내생산 또는 3개 회사 이하 연장요건 충족</span></label>
-                  <label class="choice" data-pricing-detail="general_long_extension"><input type="checkbox" data-pricing-field="general_long_extension" data-pricing-automatic><span>개량신약 4년 후 1개 회사 추가 연장 가정</span></label>
-                </div>
-                <p id="pricing-general-input-note" class="help-text"></p>
-              </div>
+              <div id="pricing-general-details" class="pricing-condition-details" hidden><p id="pricing-general-input-note" class="help-text"></p></div>
+              <div id="pricing-supply-details" class="pricing-condition-details" hidden><p id="pricing-supply-input-note" class="help-text">오리지널 기준약가의 68%를 5년 + 5년 적용하는 간편 가정입니다.</p></div>
+              <p id="pricing-simple-note" class="pricing-simple-note" hidden>간편 가정 · 오리지널 기준약가 대비</p>
             </section>
             <section class="pricing-information-group market-group" aria-labelledby="pricing-market-heading"><h3 id="pricing-market-heading">시장정보</h3><fieldset class="count-group"><legend>최초 등재 시 동일제제 합계</legend>
               <label class="choice"><input type="radio" name="identical-count-band" data-field="identical_count_band" value="lt14" data-pricing-automatic><span>14개 미만</span></label>
@@ -109,7 +94,7 @@
             </fieldset><div class="field pricing-listing-date"><label for="listing-date">우리 제품 예상 등재일</label><input id="listing-date" data-pricing-field="listing_date" data-pricing-automatic type="date"></div></section>
           </div>
           <div class="pricing-amounts">
-            <div class="field"><label for="original-price">오리지널 기준약가 <span class="label-unit">원/T</span></label><input id="original-price" data-field="original_price" data-pricing-automatic type="text" inputmode="decimal" placeholder="최초 제네릭 진입 전 기준가격"><small>최초 제네릭 진입 전 산정 기준가격</small></div>
+            <div class="field"><label for="original-price">오리지널 기준약가 <span class="label-unit">원/T</span></label><input id="original-price" data-field="original_price" data-pricing-automatic type="text" inputmode="decimal" placeholder="오리지널 기준약가 입력"><small>간편 가산은 이 금액 대비 비율로 계산합니다.</small></div>
             <div id="manual-price-wrap" class="field"><label for="manual-price">우리 제품 약가 <span class="label-unit">원/T</span></label><input id="manual-price" data-field="manual_price" type="text" inputmode="decimal" placeholder="직접 입력값"><small>직접 입력값을 별도로 보관합니다.</small></div>
             <div id="calculated-price-wrap" class="pricing-calculated-price" hidden><span>우리 제품 적용 약가</span><div><output id="calculated-price">계산 불가</output><span class="label-unit">원/T</span></div><p id="selected-pricing-year">선택 연차: 1년차</p></div>
           </div>
@@ -120,7 +105,7 @@
           <p id="pricing-forecast-summary" class="pricing-forecast-summary"></p><p id="pricing-forecast-context" class="pricing-forecast-context"></p>
           <div id="pricing-forecast-chart" class="pricing-forecast-chart" role="group" aria-label="등재 후 연차별 예상 약가"><div id="pricing-y-axis" class="pricing-y-axis" aria-hidden="true"></div><div class="pricing-year-scroll"><div id="pricing-year-bars" class="pricing-year-bars"></div></div></div>
           <p id="pricing-forecast-message" class="pricing-forecast-message" role="status" aria-live="polite" hidden></p>
-          <p class="pricing-forecast-assumption">선택한 조건과 제도 유지 가정에 따른 예상치입니다. 기등재 재평가·실거래가 조정·사용량–약가 연동 등 별도 사후 조정은 포함하지 않습니다.</p>
+          <p class="pricing-forecast-assumption">선택한 조건과 간편 가정에 따른 예상치입니다. 실제 약가 심사 결과를 확정하는 금액은 아닙니다.</p>
           <div id="pricing-calculation-details" class="pricing-calculation-details"></div>
         </section>
       </section>

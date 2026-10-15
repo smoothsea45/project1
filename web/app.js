@@ -12,6 +12,8 @@
   let dirty = false;
   let selectedRows = new Set();
   let currentResult;
+  // The comparison preview starts at year 1 independently of the input-page selection.
+  const comparisonYears = new Map();
   let toastTimer;
   let storageMessage = '';
   let storageAvailable = true;
@@ -308,64 +310,39 @@
     const p = s.pricing_conditions;
     const automatic = s.pricing_mode === 'official';
     const general = p.general_category !== 'none';
+    const simple = general || p.supply_category !== 'none';
     $('manual-price-wrap').hidden = automatic;
     $('manual-price').disabled = automatic;
     $('calculated-price-wrap').hidden = !automatic;
     $('calculated-price').textContent = format(pricing.amount, 2, '계산 불가');
     $('selected-pricing-year').textContent = '선택 연차: ' + p.selected_year + '년차';
-    $('pricing-company-details').hidden = general || !s.company_type || s.company_type === 'general';
+    $('pricing-company-details').hidden = simple || !s.company_type || s.company_type === 'general';
+    $('pricing-base-criteria').hidden = p.general_category === 'biologic' || p.supply_category !== 'none';
     $('pricing-supply-details').hidden = p.supply_category === 'none';
-    $('pricing-supply-special').hidden = p.supply_category !== 'own_injectable_pediatric';
     $('pricing-general-details').hidden = !general;
-    const allowedTypes = p.general_category === 'biologic' ? ['biosimilar'] : p.general_category === 'improved' ? ['salt_isomer', 'new_form', 'new_dose', 'combination'] : ['salt_isomer', 'new_form', 'new_dose'];
-    const subtype = document.querySelector('[data-pricing-field="general_subtype"]');
-    for (const option of subtype.options) {
-      option.disabled = option.value !== '' && !allowedTypes.includes(option.value);
-      option.hidden = option.disabled;
-    }
-    const dataPath = general && ['salt_isomer', 'new_form', 'new_dose'].includes(p.general_subtype);
-    const generalBonus = dataPath && p.general_same_reference;
-    const detailVisibility = {
-      general_base: dataPath,
-      general_same_reference: dataPath,
-      general_first_listed: dataPath,
-      general_dose_equivalent: dataPath,
-      general_target_biologic: dataPath,
-      general_reference_own: dataPath,
-      general_recognized: dataPath,
-      general_trigger_date: generalBonus,
-      general_extension: generalBonus,
-      general_long_extension: Boolean(generalBonus && p.general_extension && p.general_recognized),
-      general_cap: Boolean(generalBonus && p.general_extension && !p.general_recognized),
-      company_eligible: !general,
-      domestic_extension: !general
-    };
-    for (const [field, visible] of Object.entries(detailVisibility)) {
-      const wrapper = document.querySelector('[data-pricing-detail="' + field + '"]');
-      if (wrapper) wrapper.hidden = !visible;
-    }
     // Disabled inputs cannot receive clicks, focus, or keyboard edits in manual mode.
     document.querySelectorAll('[data-pricing-automatic]').forEach(input => {
       const hidden = input.closest('[hidden]');
       const field = input.dataset.pricingField;
-      const parentUnmet = field === 'domestic_extension' ? !p.company_eligible
-        : field === 'supply_extension' ? !p.supply_eligible || (p.supply_category === 'own_injectable_pediatric' && !p.supply_detail_eligible)
-          : false;
+      const parentUnmet = field === 'domestic_extension' && !p.company_eligible;
       input.disabled = !automatic || parentUnmet || Boolean(hidden && document.querySelector('.pricing-card').contains(hidden));
     });
-    $('pricing-general-input-note').textContent = p.general_category === 'biologic'
-      ? '생물의약품은 기등재 여부·개발목표제품·최초등재 등 별도 산정경로 확인이 필요합니다. 일반 제네릭 산정률을 대신 적용하지 않습니다.'
-      : p.general_subtype === 'combination'
-        ? '복합제는 성분별 비교 기준금액과 해당 산정경로가 필요합니다. 현재 입력으로 임의의 기본약가를 만들지 않습니다.'
-        : '개발목표제품의 상한금액과 동등 투약비용을 확인하세요. 가산 기산일이 등재일과 다른 경로는 추가 확인이 필요합니다.';
-    $('pricing-migration-notice').hidden = !p.migration_review;
+    const scheduleNotes = {
+      data_submission: '1년차 70% → 2~4년차 60%', improved: '1년차 70%',
+      improved_combo: '1년차 68%', other: '1~4년차 60%', biologic: '1~5년차 80%'
+    };
+    $('pricing-general-input-note').textContent = p.supply_category !== 'none'
+      ? '수급안정 선택 중에는 일반가산 일정을 적용하지 않습니다.' : scheduleNotes[p.general_category] || '';
+    $('pricing-supply-input-note').textContent = '1~5년차 68% + 6~10년차 68% · 수급안정 일정 우선 적용 · 일반/기업 가산 합산 없음';
+    $('pricing-simple-note').hidden = !simple;
+    $('pricing-migration-notice').hidden = simple || !p.migration_review;
     $('pricing-migration-message').textContent = p.migration_review;
     $('pricing-review-legacy').disabled = !automatic;
-    $('pricing-status').textContent = !automatic ? '사용자 입력값' : pricing.status === 'ready' ? '예상 약가' : pricing.status === 'needs_conditions' ? '추가 산정조건 필요' : '입력 확인';
+    $('pricing-status').textContent = !automatic ? '사용자 입력값' : ['ready', 'zero'].includes(pricing.status) ? (simple ? '간편 가정' : '예상 약가') : pricing.status === 'needs_conditions' ? '조건 확인' : '입력 확인';
     $('pricing-status').className = 'status-pill' + ((!automatic || pricing.status === 'ready') ? ' success' : '');
     $('pricing-source').textContent = pricing.source + (automatic ? ' · ' + p.selected_year + '년차' : '');
     $('pricing-input-note').textContent = automatic
-      ? '선택한 조건으로 계산한 연차별 예상 약가를 사용합니다. 막대를 선택하면 해당 연차의 약가가 원가계산에 반영됩니다.'
+      ? '선택한 연차의 약가를 원가계산에 사용합니다. 간편 가산 비율은 오리지널 기준약가에 직접 적용합니다.'
       : '직접 입력한 우리 제품 약가를 원가계산에 사용합니다.';
     renderPricingForecast(pricing, automatic);
   }
@@ -396,7 +373,9 @@
     $('pricing-forecast-summary').textContent = groups.map(group => group.start + (group.end === group.start ? '' : '~' + group.end) + '년차 ' + format(group.amount) + '원' + (group.assumption ? ' (연장요건 충족 가정)' : '')).join(' → ');
     const s = active();
     const company = {general: '일반기업', innovative: '혁신형 제약기업', near: '준혁신형 제약기업', supply_leader: '수급안정 선도기업'}[s.company_type];
-    $('pricing-forecast-context').textContent = [company, s.pricing_conditions.general_category === 'none' ? '최초 제네릭 등재군' : '별도 기본 산정경로', s.identical_count_band === 'ge14' ? '14개 이상 유발' : s.identical_count_band === 'lt14' ? '14개 미만' : ''].filter(Boolean).join(' · ');
+    $('pricing-forecast-context').textContent = pricing.model === 'simplified-v1'
+      ? '간편 가정 · 오리지널 기준약가 대비 비율 · 가산 중복 합산 없음'
+      : [company, '최초 제네릭 등재군', s.identical_count_band === 'ge14' ? '14개 이상 유발' : s.identical_count_band === 'lt14' ? '14개 미만' : ''].filter(Boolean).join(' · ');
     let maximum = new D(0);
     years.forEach(year => { if (year.amount.gt(maximum)) maximum = year.amount; });
     const scale = maximum.gt(0) ? maximum.mul('1.18') : new D(1);
@@ -430,9 +409,14 @@
       });
       bars.append(button);
     }
-    const details = $('pricing-calculation-details');
+    let details = $('pricing-calculation-details');
+    if (pricing.model === 'simplified-v1') {
+      const disclosure = element('details');
+      disclosure.append(element('summary', '계산 가정 보기'));
+      const body = element('div'); disclosure.append(body); details.append(disclosure); details = body;
+    }
     const effective = pricing.effective_requirements;
-    if (effective && active().pricing_conditions.general_category === 'none') {
+    if (effective && pricing.model !== 'simplified-v1') {
       details.append(element('p', '실제 적용 기준요건: 생동·임상 ' + (effective.own_data ? '충족' : '미충족') + ' · DMF ' + (effective.dmf ? '충족' : '미충족') + ' (' + effective.count + '개)'));
       for (const reason of effective.deemed_reasons || []) details.append(element('p', reason));
     }
@@ -579,7 +563,9 @@
       }
     }
     $('comparison-head').append(header);
-    const results = project.scenarios.map(s => E.calculate(s));
+    const results = project.scenarios.map(s => E.calculate(Object.assign({}, s, {
+      pricing_conditions: Object.assign({}, s.pricing_conditions, {selected_year: comparisonYears.get(s.id) || 1})
+    })));
     const apiDetails = (s, value) => {
       const list = element('div', undefined, 'comparison-api-list');
       for (const material of s.materials.filter(m => m.kind === 'api')) {
@@ -607,6 +593,7 @@
         renderComposition(r, chart);
         return chart;
       }],
+      ['price_forecast', '연차별 약가 · 제조원가', (s, r) => renderComparisonPrices(s, r)],
       ['api_cost', 'API 비용', (s, r) => [r.api_batch, r.api_unit]],
       ['excipient_cost', '부형제 비용', (s, r) => [r.excipient_batch, r.excipient_unit]],
       ['packaging_cost', '포자재비', (s, r) => [s.batch_packaging, r.packaging_unit]],
@@ -637,6 +624,65 @@
       });
       $('comparison-body').append(tr);
     }
+  }
+  function renderComparisonPrices(scenario, result) {
+    const chart = element('div', undefined, 'comparison-price-chart');
+    chart.dataset.scenarioId = scenario.id;
+    const selected = comparisonYears.get(scenario.id) || 1;
+    const heading = element('div', undefined, 'comparison-price-heading');
+    heading.append(element('strong', selected + '년차 기준'), element('span', result.pricing.model === 'simplified-v1' ? '간편 · 원/T' : '원/T'));
+    chart.append(heading);
+    let years = result.pricing.years || [];
+    if (scenario.pricing_mode === 'manual' && result.pricing.amount !== null) {
+      years = Array.from({length: 10}, (_, i) => ({year: i + 1, amount: result.pricing.amount, label: '직접 입력 약가 유지 가정'}));
+    }
+    if (years.length !== 10) {
+      chart.append(element('p', '약가 조건을 입력하면 10년 약가를 표시합니다.', 'comparison-price-message'));
+      chart.append(element('p', '제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-price-legend'));
+      return chart;
+    }
+    let maximum = new D(0);
+    years.forEach(year => { if (year.amount.gt(maximum)) maximum = year.amount; });
+    if (result.total_cost !== null && result.total_cost.gt(maximum)) maximum = result.total_cost;
+    const scale = maximum.gt(0) ? maximum.mul('1.1') : new D(1);
+    chart.dataset.scaleMaximum = scale.toString();
+    const plot = element('div', undefined, 'comparison-price-plot');
+    const bars = element('div', undefined, 'comparison-price-bars');
+    for (const year of years) {
+      const button = element('button', undefined, 'comparison-price-year' + (year.kind === 'bonus' ? ' bonus' : '') + (year.assumption ? ' extension' : ''));
+      button.type = 'button';
+      button.dataset.comparisonYear = year.year;
+      button.dataset.scenarioId = scenario.id;
+      button.dataset.amount = year.amount.toString();
+      button.setAttribute('aria-pressed', String(selected === year.year));
+      button.title = year.year + '년차 · 약가 ' + format(year.amount) + ' 원/T · 제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T')
+        + (year.start_date ? '\n' + year.start_date + '~' + year.end_date : '') + (year.label ? '\n' + year.label : '');
+      button.setAttribute('aria-label', scenario.name + ' ' + button.title);
+      const column = element('span', undefined, 'comparison-price-column');
+      const fill = element('span', undefined, 'comparison-price-fill');
+      fill.style.height = year.amount.div(scale).mul(100).toNumber() + '%';
+      fill.setAttribute('aria-hidden', 'true'); column.append(fill);
+      button.append(column, element('span', String(year.year), 'comparison-price-label'));
+      button.addEventListener('click', () => {
+        comparisonYears.set(scenario.id, year.year);
+        renderComparison();
+        const replacement = [...$('comparison-body').querySelectorAll('[data-comparison-year]')].find(node => node.dataset.scenarioId === scenario.id && Number(node.dataset.comparisonYear) === year.year);
+        if (replacement) replacement.focus({preventScroll: true});
+      });
+      bars.append(button);
+    }
+    plot.append(bars);
+    if (result.total_cost !== null) {
+      const line = element('span', undefined, 'comparison-cost-line');
+      line.dataset.cost = result.total_cost.toString();
+      line.style.bottom = result.total_cost.div(scale).mul(100).toNumber() + '%';
+      line.title = '제조원가 ' + format(result.total_cost) + ' 원/T';
+      line.setAttribute('aria-hidden', 'true'); plot.append(line);
+    }
+    chart.append(plot);
+    const legend = element('p', '1~10년차 · 제조원가 ' + format(result.total_cost) + (result.total_cost === null ? '' : ' 원/T'), 'comparison-price-legend');
+    chart.append(legend);
+    return chart;
   }
   function selectTab(name) {
     document.querySelectorAll('[data-tab]').forEach(button => {
@@ -706,10 +752,6 @@
     input.addEventListener(event, () => {
       if (input.type === 'radio' && !input.checked) return;
       active().pricing_conditions[field] = input.type === 'checkbox' ? input.checked : input.value;
-      if (field === 'general_category') {
-        active().pricing_conditions.general_subtype = '';
-        document.querySelector('[data-pricing-field="general_subtype"]').value = '';
-      }
       changed();
     });
   });
@@ -736,6 +778,7 @@
   $('delete-scenario').addEventListener('click', () => {
     if (project.scenarios.length < 2) return;
     if (!confirm('현재 시나리오를 삭제할까요?')) return;
+    comparisonYears.delete(project.active_scenario_id);
     project.scenarios = project.scenarios.filter(s => s.id !== project.active_scenario_id); project.active_scenario_id = project.scenarios[0].id; renderAll(); changed();
   });
   for (const [id, kind] of [['add-api', 'api'], ['add-excipient', 'excipient']]) $(id).addEventListener('click', () => {
@@ -753,8 +796,8 @@
   });
   window.addEventListener('beforeprint', prepareComparisonPrint);
   window.addEventListener('afterprint', () => document.body.classList.remove('printing-comparison'));
-  $('new-project').addEventListener('click', async () => { if (!(await confirmDiscard())) return; project = E.makeProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
-  $('load-example').addEventListener('click', async () => { if (!(await confirmDiscard())) return; project = E.createExampleProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
+  $('new-project').addEventListener('click', async () => { if (!(await confirmDiscard())) return; comparisonYears.clear(); project = E.makeProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
+  $('load-example').addEventListener('click', async () => { if (!(await confirmDiscard())) return; comparisonYears.clear(); project = E.createExampleProject(); dirty = false; renderAll(); persistDraft(); updateStatus(); });
   $('open-project').addEventListener('click', () => $('open-file').click());
   $('open-file').addEventListener('change', async event => {
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
@@ -762,6 +805,7 @@
       if (file.size > 16 * 1024 * 1024) throw new Error('프로젝트 파일은 16MB 이하여야 합니다.');
       const loaded = E.parseProject(await file.text());
       if (!(await confirmDiscard())) return;
+      comparisonYears.clear();
       project = loaded; dirty = false; renderAll(); persistDraft(); updateStatus(); showToast('프로젝트를 열었습니다: ' + file.name);
     } catch (error) { showToast('파일을 열 수 없습니다: ' + error.message); }
   });

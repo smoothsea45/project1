@@ -22,7 +22,7 @@ from web.tests.test_browser import (
 
 COMPARISON_FIELDS = [
     "batch_size", "yield_percent", "packaging_form", "api_supplier",
-    "api_price", "price", "total_cost", "cost_rate", "composition", "cost_basis", "api_cost",
+    "api_price", "price", "total_cost", "cost_rate", "composition", "price_forecast", "cost_basis", "api_cost",
     "excipient_cost", "packaging_cost", "labor_cost",
 ]
 
@@ -182,6 +182,7 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
         expect(cost_cell(page, field, clone_id, "batch")).to_have_text(batch)
         expect(cost_cell(page, field, clone_id, "unit")).to_have_text(unit)
     expect(page.locator(".comparison-composition")).to_have_count(2)
+    expect(comparison_row(page, 'price_forecast').locator('.comparison-price-chart')).to_have_count(2)
     for item in project(page)["scenarios"]:
         graph = comparison_chart(page, item["id"])
         expect(graph.locator('[data-chart-part="donut"]')).to_have_count(1)

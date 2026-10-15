@@ -73,6 +73,12 @@
         conditions.migration_review = notices.join(' ');
         scenario.pricing_conditions = conditions;
       }
+      const conditions = scenario.pricing_conditions;
+      if (conditions && typeof conditions === 'object' && !Array.isArray(conditions) && !Object.prototype.hasOwnProperty.call(conditions, 'model_id')) {
+        // An older detailed-model file is upgraded only once; keep its original subtype for a lossless round trip.
+        if (conditions.general_category === 'improved' && conditions.general_subtype === 'combination') conditions.general_category = 'improved_combo';
+        conditions.model_id = 'simplified-v1';
+      }
     }
     return scenario;
   }
@@ -318,7 +324,8 @@
     Pricing.BOOLEAN_FIELDS.forEach(field => {
       if (typeof conditions[field] !== 'boolean') fileError(path + ' ' + field + '은(는) 체크 여부여야 합니다.');
     });
-    choice(conditions.general_category, path + ' 일반가산', ['none', 'data_submission', 'improved', 'biologic']);
+    choice(conditions.general_category, path + ' 일반가산', ['none', 'data_submission', 'improved', 'improved_combo', 'other', 'biologic']);
+    choice(conditions.model_id, path + ' 간편모델', ['simplified-v1']);
     choice(conditions.supply_category, path + ' 수급안정 가산', ['none', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
     choice(conditions.general_subtype, path + ' 세부 산정유형', ['', 'salt_isomer', 'new_form', 'new_dose', 'combination', 'biosimilar']);
     if (!Number.isInteger(conditions.selected_year) || conditions.selected_year < 1 || conditions.selected_year > 10) fileError(path + ' 적용 연차는 1~10의 정수여야 합니다.');

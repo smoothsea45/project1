@@ -133,7 +133,7 @@ def test_pricing_choices_on_left_prices_on_right_and_drug_groups_are_independent
     page.locator('[data-field="pricing_mode"][value="official"]').check()
     general = page.locator('[data-pricing-field="general_category"]')
     supply = page.locator('[data-pricing-field="supply_category"]')
-    expect(general).to_have_count(4)
+    expect(general).to_have_count(6)
     expect(supply).to_have_count(4)
     for choice in general.all() + supply.all():
         expect(choice).to_have_attribute("type", "radio")
@@ -503,10 +503,9 @@ def test_json_download_open_restores_pricing_conditions_product_and_scenarios(pa
     page.locator('[data-field="pricing_mode"][value="official"]').check()
     page.locator('[name="company-type"][value="near"]').check()
     page.locator('[name="identical-count-band"][value="ge14"]').check()
+    page.locator('[data-pricing-field="own_data"]').check()
     page.locator('[data-pricing-field="general_category"][value="improved"]').check()
     page.locator('[data-pricing-field="supply_category"][value="api_self"]').check()
-    page.locator('[data-pricing-field="supply_eligible"]').check()
-    page.locator('[data-pricing-field="own_data"]').check()
     page.once("dialog", lambda dialog: dialog.accept("비교안"))
     page.locator("#clone-scenario").click()
     page.locator("#yield-percent").fill("98")
@@ -521,11 +520,10 @@ def test_json_download_open_restores_pricing_conditions_product_and_scenarios(pa
     expect(page.locator("#yield-percent")).to_have_value("98")
     expect(page.locator('[data-pricing-field="general_category"][value="improved"]')).to_be_checked()
     expect(page.locator('[data-pricing-field="supply_category"][value="api_self"]')).to_be_checked()
-    expect(page.locator('[data-pricing-field="supply_eligible"]')).to_be_checked()
     assert project(page) == expected
 
 
-def test_legacy_multiple_drug_additions_are_preserved_with_review_notice(page, tmp_path):
+def test_legacy_multiple_drug_additions_are_preserved_without_hidden_condition_blocking(page, tmp_path):
     setup_base(page)
     add_material(page)
     payload = save_file(page, tmp_path / "before.json")
@@ -537,22 +535,22 @@ def test_legacy_multiple_drug_additions_are_preserved_with_review_notice(page, t
         "mimeType": "application/json",
         "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8"),
     })
-    expect(page.locator("#input-errors")).to_be_hidden()
-    expect(page.locator("#pricing-migration-notice")).to_be_visible()
-    expect(page.locator("#pricing-migration-message")).to_contain_text("다시 확인")
+    expect(page.locator("#manual-price")).to_have_value("300")
     assert scenario(page)["pricing_flags"] == ["originator_data", "api_self"]
-    assert scenario(page)["pricing_conditions"]["general_category"] == "none"
     assert scenario(page)["pricing_conditions"]["supply_category"] == "api_self"
     saved = save_file(page, tmp_path / "multiple.json")
     assert saved["scenarios"][0]["pricing_flags"] == ["originator_data", "api_self"]
     page.locator('[data-field="pricing_mode"][value="official"]').check()
-    expect(page.locator("#calculated-price")).to_have_text("계산 불가")
-    expect(page.locator('[data-pricing-year]')).to_have_count(0)
-    page.locator("#pricing-review-legacy").click()
-    expect(page.locator("#pricing-migration-notice")).to_be_hidden()
-    assert scenario(page)["pricing_conditions"]["migration_review"] == ""
-    saved = save_file(page, tmp_path / "reviewed.json")
+    page.locator('[data-field="company_type"][value="general"]').check()
+    page.locator('[data-field="identical_count_band"][value="lt14"]').check()
+    page.locator("#original-price").fill("1000")
+    page.locator('[data-pricing-field="listing_date"]').fill("2027-09-01")
+    expect(page.locator("#calculated-price")).to_have_text("680.00")
+    expect(page.locator('[data-pricing-year]')).to_have_count(10)
+    assert scenario(page)["manual_price"] == "300"
+    saved = save_file(page, tmp_path / "simplified.json")
     assert saved["scenarios"][0]["pricing_flags"] == ["originator_data", "api_self"]
+    assert saved["scenarios"][0]["pricing_conditions"]["model_id"] == "simplified-v1"
 
 
 @pytest.mark.parametrize(
