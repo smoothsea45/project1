@@ -12,6 +12,11 @@
 .numeric{text-align:right}.project-dialog{border:1px solid var(--line);border-radius:12px;padding:24px;max-width:calc(100vw - 30px);width:460px;color:var(--ink);box-shadow:0 12px 60px #153c4d33}.project-dialog::backdrop{background:#153c4d66}.project-dialog p{margin:12px 0 22px;color:var(--ink-soft)}.dialog-actions{display:flex;gap:8px;flex-wrap:wrap}.comparison-table td{max-width:360px;white-space:normal;overflow-wrap:anywhere}.comparison-card .table-scroll{max-height:440px}
 @media(min-width:1100px){.app-header{min-height:64px;padding-top:10px;padding-bottom:10px}.brand p{display:none}.scenario-toolbar{min-height:50px}.page-tabs{margin-bottom:10px}.tab-panel{gap:10px}.product-card,.common-card{padding:10px 14px}.section-heading{padding:10px 14px 8px}.pricing-layout{padding-left:14px;padding-right:14px}.pricing-amounts{gap:7px 12px}.option-group .choice{min-height:27px;padding-top:3px;padding-bottom:3px}.pricing-bottom{padding:8px 14px;margin-top:7px}.material-table tbody td{height:36px}.material-table td input:not([type=checkbox]),.material-table td select{height:28px;padding-top:4px;padding-bottom:4px}.material-table thead th{padding-top:7px;padding-bottom:7px}.material-totals{padding:10px 14px}.fixed-card{padding:10px 14px}.app-footer{margin-top:10px}}
 
+/* 표의 열과 시나리오 경계를 옅은 세로선으로 구분합니다. */
+.material-table tr>:is(th,td):not(:last-child),.comparison-table tr>:is(th,td):not(:last-child){border-right:1px solid #d3dee4}
+.comparison-table tr>.row-label,.comparison-table tr>[colspan="2"]:not(:last-child),.comparison-table tr>[data-cost-basis="unit"]:not(:last-child){border-right:2px solid #bdccd4}
+@media screen{.comparison-api-name{box-shadow:inset -1px 0 #d3dee4}}
+
 /* 시나리오 선택은 작업 페이지 탭과 다른 색으로 구분합니다. */
 #scenario-tabs button{border-color:#d6cfea;background:#faf8ff;color:#63597d}
 #scenario-tabs button[aria-selected="true"]{background:#ede6fa;border-color:#8061b1;color:#55347e;box-shadow:inset 0 -2px #8061b1}
