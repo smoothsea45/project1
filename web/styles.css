@@ -186,8 +186,8 @@
 #scenario-tabs .scenario-name{min-width:0;text-align:left;overflow-wrap:anywhere}
 #scenario-tabs .scenario-tab{position:relative}
 #scenario-tabs .scenario-tab[draggable="true"]{cursor:grab}
-#scenario-tabs .scenario-tab[draggable="false"] .scenario-drag-handle{display:none}
 #scenario-tabs .scenario-drag-handle{flex:0 0 9px;align-self:center;color:#9c88b3;font-size:16px;font-weight:400;line-height:1;letter-spacing:-1px;opacity:.7;user-select:none;pointer-events:none}
+#scenario-tabs .scenario-tab[draggable="false"] .scenario-drag-handle{display:none}
 #scenario-tabs .scenario-tab[aria-selected="true"] .scenario-drag-handle{color:#8061b1;opacity:.9}
 #scenario-tabs .scenario-tab:hover .scenario-drag-handle{opacity:1}
 #scenario-tabs .scenario-tab.dragging{opacity:.4;cursor:grabbing}
@@ -293,21 +293,25 @@
 .comparison-price-chart{width:100%;min-width:0;font-weight:400;font-variant-numeric:tabular-nums}
 .comparison-price-heading{display:flex;align-items:baseline;justify-content:space-between;gap:5px;min-height:16px;font-size:10px;line-height:1.5;color:var(--ink-soft);white-space:normal}
 .comparison-price-heading strong{font-weight:600;color:var(--teal-dark)}
-.comparison-price-plot{height:90px;position:relative;margin:7px 0 19px;border-bottom:1px solid #c7d6dc;background:linear-gradient(to top,transparent calc(50% - 1px),#e8eff1 calc(50% - 1px),#e8eff1 50%,transparent 50%)}
-.comparison-price-bars{height:100%;display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px;position:relative;z-index:1}
+.comparison-price-plot{height:160px;position:relative;margin:9px 0 19px;border-bottom:1px solid #c7d6dc;background:linear-gradient(to top,transparent calc(50% - 1px),#e8eff1 calc(50% - 1px),#e8eff1 50%,transparent 50%)}
+.comparison-price-bars{height:100%;display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:4px;position:relative;z-index:1}
 .comparison-price-year{position:relative;display:block;min-width:0;width:100%;height:100%;padding:0 2px;border:0;border-radius:3px 3px 0 0;background:transparent;color:var(--ink-soft)}
 .comparison-price-year:hover{background:#118b8710}
 .comparison-price-year[aria-pressed=true],.comparison-price-year.selected{background:#118b8714;box-shadow:inset 0 0 0 1px #118b8770}
 .comparison-price-year:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
 .comparison-price-column{position:relative;display:flex;align-items:flex-end;justify-content:center;width:100%;height:100%;min-width:0}
-.comparison-price-stack{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;width:min(19px,100%);min-height:0;border-radius:3px 3px 0 0;overflow:hidden}
+.comparison-price-stack{position:absolute;bottom:0;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;width:min(27px,100%);min-height:0;border-radius:3px 3px 0 0;overflow:hidden}
 .comparison-price-fill,.comparison-cost-fill,.comparison-excess-fill,.comparison-unresolved-fill{position:static;display:block;flex:0 0 auto;width:100%;min-height:0;border-radius:0;pointer-events:none}
 .comparison-price-fill{background:#7f94b7}
 .comparison-cost-fill{background:#bd7952}
 .comparison-excess-fill{background:#be625d}
 .comparison-unresolved-fill{background:#c4ced3}
-.comparison-year-rate{position:absolute;left:50%;bottom:calc(var(--stack-height) + 3px);transform:translateX(-50%);z-index:2;color:var(--ink-soft);font-size:8px;line-height:10px;letter-spacing:-.2px;white-space:nowrap;pointer-events:none}
-.comparison-year-rate.unavailable{font-size:7px;letter-spacing:-.3px}
+.comparison-year-price{position:absolute;left:50%;bottom:calc(var(--stack-height) + 4px);transform:translateX(-50%);z-index:2;width:max-content;max-width:calc(100% + 4px);color:var(--ink-soft);font-size:8px;line-height:11px;letter-spacing:-.2px;font-weight:600;text-align:center;white-space:normal;overflow-wrap:anywhere;pointer-events:none}
+.comparison-year-price.compact{font-size:7px;letter-spacing:-.4px}
+.comparison-year-rate{position:absolute;left:50%;bottom:calc(var(--cost-height) / 2);transform:translate(-50%,50%);z-index:2;color:#fff;font-size:9px;line-height:11px;letter-spacing:-.35px;font-weight:700;text-shadow:0 1px 1px #66391c50;white-space:nowrap;pointer-events:none}
+.comparison-year-rate.compact{bottom:1px;transform:translateX(-50%);padding:0 2px;border:1px solid #dec3b0;border-radius:3px;background:#fff8f1;color:#8f5737;font-size:8px;line-height:10px;letter-spacing:-.3px;text-shadow:none}
+.comparison-year-rate.zero,.comparison-year-rate.unavailable{bottom:1px;transform:translateX(-50%);padding:0 2px;border:1px solid #d3dee3;border-radius:3px;background:#f4f7f8;color:#718590;font-size:8px;line-height:10px;letter-spacing:-.3px;text-shadow:none}
+.comparison-price-column:has(.comparison-year-rate.compact,.comparison-year-rate.zero,.comparison-year-rate.unavailable) .comparison-year-price{bottom:max(calc(var(--stack-height) + 4px),18px)}
 .comparison-price-year.bonus .comparison-price-fill{background:var(--teal)}
 .comparison-price-year.extension .comparison-price-fill{background:#66afa5}
 .comparison-price-label{position:absolute;left:50%;bottom:-17px;transform:translateX(-50%);font-size:9px;line-height:14px;white-space:nowrap}
@@ -386,7 +390,7 @@
   .comparison-table tbody{display:table-row-group}
   .comparison-table col{width:auto!important}
   .comparison-table col:first-child{width:108px!important}
-  .comparison-table th,.comparison-table td,.comparison-table tbody th,.comparison-table tbody td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:1.5px 5px;font-size:10px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+  .comparison-table th,.comparison-table td,.comparison-table tbody th,.comparison-table tbody td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:1px 5px;font-size:10px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
   .comparison-table th.row-label,.comparison-table td.row-label{width:108px!important;min-width:0!important;font-size:10px}
   .comparison-table thead th:not(.row-label){font-size:12px;line-height:1.2;padding:2px 5px}
   .comparison-table .comparison-unit-header th{background:#f0f5f6;font-size:9px;padding:2px 5px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
@@ -409,8 +413,8 @@
   .comparison-composition .composition-remainder-note{font-size:8px;line-height:1.3;gap:2px;margin-top:2px}
   .comparison-composition .composition-subheading{font-size:10px}
   .comparison-composition .composition-denominator{font-size:9px;margin-top:1px}
-  .comparison-composition .stack-detail{grid-template-columns:17px minmax(0,1fr);gap:6px;margin-top:4px;min-height:60px}
-  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:60px}
+  .comparison-composition .stack-detail{grid-template-columns:17px minmax(0,1fr);gap:6px;margin-top:4px;min-height:50px}
+  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:50px}
   .comparison-composition .composition-stack{border-radius:3px}
   .comparison-composition .composition-row{grid-template-columns:minmax(0,88px) minmax(0,1fr);gap:5px;font-size:9px;line-height:1.25}
   .comparison-composition .composition-label{gap:3px;flex-wrap:nowrap}
@@ -423,12 +427,15 @@
   .comparison-table tr:has(.comparison-price-chart){break-inside:avoid;page-break-inside:avoid}
   .comparison-table td:has(.comparison-price-chart){padding:3px 5px!important;vertical-align:top}
   .comparison-price-heading{min-height:11px;font-size:8px;line-height:1.3;gap:3px}
-  .comparison-price-plot{height:40px;margin:3px 0 13px;border-bottom-width:1px}
+  .comparison-price-plot{height:60px;margin:8px 0 13px;border-bottom-width:1px}
   .comparison-price-bars{gap:2px}
   .comparison-price-year{padding:0 1px;border-radius:2px 2px 0 0}
-  .comparison-price-stack{width:min(14px,100%);border-radius:2px 2px 0 0}
-  .comparison-year-rate{font-size:6.5px;line-height:8px;letter-spacing:-.15px}
-  .comparison-year-rate.unavailable{font-size:5.5px;letter-spacing:-.3px}
+  .comparison-price-stack{width:min(22px,100%);border-radius:2px 2px 0 0}
+  .comparison-year-price{bottom:calc(var(--stack-height) + 3px);font-size:6.5px;line-height:8px;letter-spacing:-.2px}
+  .comparison-year-price.compact{font-size:5.5px;letter-spacing:-.3px}
+  .comparison-year-rate{font-size:7px;line-height:9px;letter-spacing:-.25px}
+  .comparison-year-rate.compact,.comparison-year-rate.zero,.comparison-year-rate.unavailable{bottom:0;padding:0 1px;border-width:.5px;border-radius:2px;font-size:6px;line-height:7px;letter-spacing:-.3px}
+  .comparison-price-column:has(.comparison-year-rate.compact,.comparison-year-rate.zero,.comparison-year-rate.unavailable) .comparison-year-price{bottom:max(calc(var(--stack-height) + 3px),12px)}
   .comparison-price-label{bottom:-12px;font-size:7px;line-height:10px}
   .comparison-price-legend{margin-top:2px;font-size:8px;line-height:1.3;gap:2px 7px}
   .comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key{gap:3px}
