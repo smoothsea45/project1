@@ -22,7 +22,7 @@ from web.tests.test_browser import (
 
 COMPARISON_FIELDS = [
     "name", "batch_size", "yield_percent", "packaging_form", "api_supplier",
-    "api_price", "price", "total_cost", "cost_rate", "composition", "api_cost",
+    "api_price", "price", "total_cost", "cost_rate", "composition", "cost_basis", "api_cost",
     "excipient_cost", "packaging_cost", "labor_cost",
 ]
 

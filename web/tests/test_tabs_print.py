@@ -28,9 +28,15 @@ def clone(page, name):
     return scenario(page)["id"]
 
 
-def four_scenarios(page):
+def four_scenarios(page, detailed_api=False):
     setup_base(page)
-    add_material(page)
+    first = add_material(page)
+    if detailed_api:
+        first.locator('[data-material-field="name"]').fill("보노프라잔 푸마레이트")
+        first.locator('[data-material-field="supplier"]').fill("제조원 A / 검토 공급처")
+        second = add_material(page, amount="10", price="500000")
+        second.locator('[data-material-field="name"]').fill("아목시실린 수화물")
+        second.locator('[data-material-field="supplier"]').fill("제조원 B / 수입 공급처")
     names = ["기본 시나리오", "PTP 비교안", "병 포장 비교안", "최종 검토안"]
     ids = [scenario(page)["id"]]
     page.locator("#packaging-form").fill("30T / PTP")
@@ -38,7 +44,7 @@ def four_scenarios(page):
     for index in range(1, 4):
         ids.append(clone(page, names[index]))
         page.locator("#manual-price").fill(str((index + 1) * 100))
-        page.locator('[data-material-field="price"]').fill(str((index + 1) * 1000000))
+        page.locator('[data-material-field="price"]').first.fill(str((index + 1) * 1000000))
         page.locator("#packaging-form").fill(f"{30 * (index + 1)}T / 포장")
     return ids
 
@@ -59,13 +65,37 @@ def test_result_layout_stacks_numbers_and_emphasizes_rate_only(page, width):
     assert boxes[0]["y"] + boxes[0]["height"] <= boxes[1]["y"] + 1
     assert boxes[1]["y"] + boxes[1]["height"] <= boxes[2]["y"] + 1
     graph = page.locator("#tab-results .composition-card").bounding_box()
+    assert page.locator(".results-layout > div").evaluate_all(
+        "nodes => nodes.map(node => node.className)"
+    ) == ["results-detail-grid", "metric-grid"]
     if width >= 1024:
-        assert boxes[0]["x"] + boxes[0]["width"] < graph["x"]
+        assert graph["x"] + graph["width"] < boxes[0]["x"]
         assert abs(boxes[0]["y"] - graph["y"]) <= 1
         assert abs(boxes[0]["x"] - boxes[2]["x"]) <= 1
     else:
-        assert boxes[2]["y"] + boxes[2]["height"] <= graph["y"] + 1
+        assert graph["y"] + graph["height"] <= boxes[0]["y"] + 1
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
+
+
+def test_scenario_selection_and_work_tabs_have_distinct_colors_and_selected_state(page):
+    selected_id = page.locator('#scenario-tabs [aria-selected="true"]').get_attribute("data-scenario-id")
+    other_id = page.locator('#scenario-tabs [aria-selected="false"]').first.get_attribute("data-scenario-id")
+    scenario_selected = page.locator(f'#scenario-tabs [data-scenario-id="{selected_id}"]')
+    scenario_unselected = page.locator(f'#scenario-tabs [data-scenario-id="{other_id}"]')
+    work_selected = page.locator('.page-tabs [aria-selected="true"]')
+    work_unselected = page.locator('.page-tabs [aria-selected="false"]').first
+
+    def colors(locator):
+        return locator.evaluate("node => { const s = getComputedStyle(node); return [s.backgroundColor, s.color, s.borderColor]; }")
+
+    assert colors(scenario_selected) != colors(work_selected)
+    assert colors(scenario_unselected) != colors(work_unselected)
+    assert colors(scenario_selected) != colors(scenario_unselected)
+    assert colors(work_selected) != colors(work_unselected)
+    scenario_unselected.click()
+    expect(scenario_unselected).to_have_attribute("aria-selected", "true")
+    expect(scenario_selected).to_have_attribute("aria-selected", "false")
+    assert colors(scenario_unselected) != colors(work_selected)
 
 
 def test_scenario_tabs_select_independent_values_and_support_keyboard(page):
@@ -162,9 +192,20 @@ def test_comparison_has_two_cost_columns_per_scenario_with_actual_independent_va
         "rows => rows.map(row => row.dataset.comparisonField)"
     ) == COMPARISON_FIELDS
     headers = page.locator("#comparison-head tr").first.locator("th")
+    expect(page.locator("#comparison-head tr")).to_have_count(1)
+    expect(page.locator("#comparison-head")).not_to_contain_text("배치당")
+    expect(page.locator("#comparison-head")).not_to_contain_text("1T당")
     expect(headers).to_have_count(5)
     for heading in headers.all()[1:]:
         expect(heading).to_have_attribute("colspan", "2")
+    cost_header = comparison_row(page, "cost_basis")
+    expect(cost_header).to_have_class("comparison-unit-header")
+    expect(cost_header.locator("th")).to_have_text(["비용 구분"] + ["배치당 (원)", "1T당 (원/T)"] * 4)
+    composition_box = comparison_row(page, "composition").bounding_box()
+    header_box = cost_header.bounding_box()
+    api_box = comparison_row(page, "api_cost").bounding_box()
+    assert composition_box["y"] + composition_box["height"] <= header_box["y"] + 1
+    assert header_box["y"] + header_box["height"] <= api_box["y"] + 1
     for index, scenario_id in enumerate(ids):
         expect(cost_cell(page, "api_cost", scenario_id, "batch")).to_have_text(f"{2000000 * (index + 1):,.2f}")
         expect(cost_cell(page, "api_cost", scenario_id, "unit")).to_have_text(f"{20 * (index + 1):.2f}")
@@ -192,10 +233,16 @@ def test_print_button_calls_browser_print_without_changing_project(page):
 
 
 @pytest.mark.skipif(not shutil.which("pdftotext"), reason="PDF text/bounds validation requires pdftotext")
-def test_four_scenarios_print_to_landscape_pdf_with_all_rows_and_visible_graphs(page, tmp_path):
-    four_scenarios(page)
+def test_four_scenarios_and_long_api_names_print_on_one_a4_page_without_clipping(page, tmp_path):
+    four_scenarios(page, detailed_api=True)
     comparison(page)
     before = project(page)
+    for field in ["api_supplier", "api_price"]:
+        for cell in comparison_row(page, field).locator("td").all():
+            for name in cell.locator(".comparison-api-name").all():
+                assert name.evaluate("node => node.clientWidth >= 120")
+                assert name.evaluate("node => node.scrollWidth <= node.clientWidth + 1")
+                assert name.evaluate("node => node.getBoundingClientRect().height <= parseFloat(getComputedStyle(node).lineHeight) + 1")
     page.emulate_media(media="print")
     expect(page.locator("#tab-comparison")).to_be_visible()
     for selector in ["#tab-input", "#tab-results", ".app-header", ".scenario-toolbar", ".page-tabs", ".app-footer", "#print-comparison"]:
@@ -212,16 +259,16 @@ def test_four_scenarios_print_to_landscape_pdf_with_all_rows_and_visible_graphs(
     root = ET.fromstring(output)
     namespace = {"x": "http://www.w3.org/1999/xhtml"}
     pages = root.findall(".//x:page", namespace)
-    assert pages
+    assert len(pages) == 1, f"Expected one printed page, got {len(pages)}"
     text = " ".join(word.text or "" for word in root.findall(".//x:word", namespace))
     for name in ["PTP 비교안", "병 포장 비교안", "최종 검토안"]:
         assert name in text
-    for expected in ["API", "부형제", "포자재비", "공수비", "배치당", "1T당", "50.00", "70.00", "90.00", "110.00", "8,000,000.00"]:
+    for expected in ["API", "부형제", "포자재비", "공수비", "배치당", "1T당", "55.00", "75.00", "95.00", "115.00", "8,500,000.00", "보노프라잔 푸마레이트", "아목시실린 수화물", "제조원 A", "제조원 B"]:
         assert expected in text
     assert "처방부터 배치 원가까지" not in text
     for pdf_page in pages:
         width, height = float(pdf_page.attrib["width"]), float(pdf_page.attrib["height"])
-        assert width > height  # CSS chooses landscape paper.
+        assert sorted([width, height]) == pytest.approx([595.28, 841.89], abs=1)
         for word in pdf_page.findall(".//x:word", namespace):
             assert 0 <= float(word.attrib["xMin"]) <= float(word.attrib["xMax"]) <= width
             assert 0 <= float(word.attrib["yMin"]) <= float(word.attrib["yMax"]) <= height

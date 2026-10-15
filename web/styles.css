@@ -12,6 +12,12 @@
 .numeric{text-align:right}.project-dialog{border:1px solid var(--line);border-radius:12px;padding:24px;max-width:calc(100vw - 30px);width:460px;color:var(--ink);box-shadow:0 12px 60px #153c4d33}.project-dialog::backdrop{background:#153c4d66}.project-dialog p{margin:12px 0 22px;color:var(--ink-soft)}.dialog-actions{display:flex;gap:8px;flex-wrap:wrap}.comparison-table td{max-width:360px;white-space:normal;overflow-wrap:anywhere}.comparison-card .table-scroll{max-height:440px}
 @media(min-width:1100px){.app-header{min-height:64px;padding-top:10px;padding-bottom:10px}.brand p{display:none}.scenario-toolbar{min-height:50px}.page-tabs{margin-bottom:10px}.tab-panel{gap:10px}.product-card,.common-card{padding:10px 14px}.section-heading{padding:10px 14px 8px}.pricing-layout{padding-left:14px;padding-right:14px}.pricing-amounts{gap:7px 12px}.option-group .choice{min-height:27px;padding-top:3px;padding-bottom:3px}.pricing-bottom{padding:8px 14px;margin-top:7px}.material-table tbody td{height:36px}.material-table td input:not([type=checkbox]),.material-table td select{height:28px;padding-top:4px;padding-bottom:4px}.material-table thead th{padding-top:7px;padding-bottom:7px}.material-totals{padding:10px 14px}.fixed-card{padding:10px 14px}.app-footer{margin-top:10px}}
 
+/* 시나리오 선택은 작업 페이지 탭과 다른 색으로 구분합니다. */
+#scenario-tabs button{border-color:#d6cfea;background:#faf8ff;color:#63597d}
+#scenario-tabs button[aria-selected="true"]{background:#ede6fa;border-color:#8061b1;color:#55347e;box-shadow:inset 0 -2px #8061b1}
+#scenario-tabs button:hover{border-color:#8061b1;background:#f1ebfa}
+#scenario-tabs button:focus-visible{outline:2px solid #8061b1;outline-offset:2px}
+
 /* 공통 입력과 약가 조건: 항목과 선택 행을 같은 기준에 맞춥니다. */
 .context-grid{grid-template-columns:minmax(330px,1fr) minmax(550px,1.6fr)}
 .common-card{grid-template-columns:1fr .8fr 1.2fr 1.1fr}
@@ -68,7 +74,7 @@
 .comparison-table thead th{position:static;background:#f4f7f8;z-index:3}
 .comparison-table thead th.row-label{position:sticky;left:0;z-index:4}
 .comparison-api-list{display:grid;gap:8px;text-align:left;line-height:1.5}
-.comparison-api-list>div{display:grid;grid-template-columns:minmax(0,92px) minmax(0,1fr);gap:12px;align-items:baseline}
+.comparison-api-list>div{display:grid;grid-template-columns:minmax(0,134px) minmax(0,1fr);gap:12px;align-items:baseline}
 .comparison-api-list span{min-width:0;overflow-wrap:anywhere}
 .comparison-api-name{font-weight:600;color:var(--ink)}
 .comparison-table th.row-label{width:166px;min-width:166px}
@@ -78,6 +84,8 @@
 .comparison-table .comparison-cost-cell,.comparison-table thead th:not(.row-label):not([colspan="2"]){min-width:170px;width:170px;text-align:right}
 .comparison-table thead tr:last-child th:not(.row-label){font-size:10px;text-align:center}
 .comparison-table .comparison-cost-cell{font-weight:600}
+.comparison-table .comparison-unit-header th{background:#f0f5f6;color:var(--ink-soft);padding:8px 13px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:10px;text-align:center;font-weight:700;white-space:normal}
+.comparison-table .comparison-unit-header th.row-label{text-align:left}
 .comparison-table .comparison-cost-cell[data-cost-basis="unit"]{color:var(--teal-dark)}
 .comparison-table td.comparison-chart-cell,.comparison-table td:has(.comparison-composition){padding:12px;vertical-align:top;text-align:left}
 .comparison-composition{width:100%;text-align:left;font-weight:400}
@@ -130,7 +138,7 @@
 }
 
 /* 결과는 왼쪽 지표와 오른쪽 그래프를 한 화면에 배치합니다. */
-.results-layout{display:grid;grid-template-columns:248px minmax(0,1fr);gap:14px;align-items:stretch}
+.results-layout{display:grid;grid-template-columns:minmax(0,1fr) 248px;gap:14px;align-items:stretch}
 .results-layout .metric-grid{grid-template-columns:1fr;grid-template-rows:repeat(3,minmax(118px,1fr));gap:10px}
 .results-layout .metric-card{padding:17px 20px}
 .results-layout .metric-card strong{font-size:30px}
@@ -165,54 +173,55 @@
 }
 
 /* 비교표 출력: 최대 네 시나리오를 A4 가로 용지에 표시합니다. */
-@page{size:A4 landscape;margin:10mm}
+@page{size:A4 landscape;margin:8mm}
 @media print{
   html,body{margin:0;padding:0;background:#fff;font-size:10px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .app-header,.scenario-toolbar,.page-tabs,#tab-input,#tab-results,.app-footer,.example-banner,.toast,.no-script,.project-dialog{display:none!important}
   #tab-comparison,#tab-comparison[hidden]{display:block!important}
   .workspace{width:100%;max-width:none;margin:0;padding:0}
   .comparison-card{border:0;border-radius:0;box-shadow:none}
-  .comparison-card .section-heading{padding:6px 0 9px;align-items:baseline}
+  .comparison-card .section-heading{padding:4px 0 5px;align-items:baseline}
   .comparison-card .section-heading h2{font-size:13px}
   .comparison-card .section-heading .section-note,.comparison-actions,.comparison-footnote{display:none!important}
-  .comparison-print-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:7px;border-bottom:1px solid var(--line)}
-  .comparison-print-heading h1{font-size:17px;margin:0;line-height:1.3;overflow-wrap:anywhere}
-  .comparison-print-heading p{font-size:10px;color:var(--ink-soft);margin-top:3px;white-space:pre-wrap;overflow-wrap:anywhere}
+  .comparison-print-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding-bottom:5px;border-bottom:1px solid var(--line)}
+  .comparison-print-heading h1{font-size:15px;margin:0;line-height:1.3;overflow-wrap:anywhere}
+  .comparison-print-heading p{font-size:10px;color:var(--ink-soft);margin-top:2px;white-space:pre-wrap;overflow-wrap:anywhere}
   #print-date{font-size:9px;color:var(--muted);white-space:nowrap}
   .comparison-card .table-scroll{overflow:visible;max-height:none;width:100%}
   .comparison-table{width:100%!important;min-width:0!important;max-width:100%;table-layout:fixed!important;margin:0;font-size:10px}
   .comparison-table thead{display:table-header-group;position:static!important}
   .comparison-table tbody{display:table-row-group}
   .comparison-table col{width:auto!important}
-  .comparison-table col:first-child{width:100px!important}
-  .comparison-table th,.comparison-table td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:5px 6px;font-size:10px;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
-  .comparison-table th.row-label,.comparison-table td.row-label{width:100px!important;min-width:0!important;font-size:10px}
+  .comparison-table col:first-child{width:108px!important}
+  .comparison-table th,.comparison-table td,.comparison-table tbody th,.comparison-table tbody td{position:static!important;min-width:0!important;max-width:none!important;width:auto!important;padding:2px 5px;font-size:10px;line-height:1.3;white-space:normal;overflow-wrap:anywhere;vertical-align:middle}
+  .comparison-table th.row-label,.comparison-table td.row-label{width:108px!important;min-width:0!important;font-size:10px}
   .comparison-table thead th:not(.row-label){font-size:11px}
-  .comparison-table thead tr:last-child th:not(.row-label){font-size:9px}
+  .comparison-table .comparison-unit-header th{background:#f0f5f6;font-size:9px;text-align:center;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
   .comparison-table .text-value{min-width:0;max-width:none;line-height:1.4}
   .comparison-table .emphasis-row td{font-size:11px}
   .comparison-api-list{gap:4px;line-height:1.3}
-  .comparison-api-list>div{grid-template-columns:minmax(0,65px) minmax(0,1fr);gap:6px}
+  .comparison-api-list>div{grid-template-columns:1fr;gap:1px}
+  .comparison-api-list .comparison-api-name{font-size:10px}
   .comparison-table tr:has(.comparison-chart-cell){break-inside:avoid;page-break-inside:avoid}
-  .comparison-table td.comparison-chart-cell,.comparison-table td:has(.comparison-composition){padding:6px;vertical-align:top}
-  .comparison-composition .composition-charts{grid-template-columns:1fr;gap:8px;padding:0;align-items:start}
-  .comparison-composition .composition-donut-wrap{width:112px;height:112px}
-  .comparison-composition .donut-center{inset:24px;gap:2px}
-  .comparison-composition .donut-center strong{font-size:17px!important;letter-spacing:-.5px}
+  .comparison-table td.comparison-chart-cell,.comparison-table td:has(.comparison-composition){padding:5px;vertical-align:top}
+  .comparison-composition .composition-charts{grid-template-columns:1fr;gap:6px;padding:0;align-items:start}
+  .comparison-composition .composition-donut-wrap{width:84px;height:84px}
+  .comparison-composition .donut-center{inset:18px;gap:1px}
+  .comparison-composition .donut-center strong{font-size:15px!important;letter-spacing:-.5px}
   .comparison-composition .donut-center-label{font-size:8px}
-  .comparison-composition .donut-total{font-size:9px;line-height:1.25}
-  .comparison-composition .donut-note{font-size:9px;line-height:1.3;margin-top:4px}
+  .comparison-composition .donut-total{font-size:8px;line-height:1.25}
+  .comparison-composition .donut-note{font-size:9px;line-height:1.3;margin-top:3px}
   .comparison-composition .composition-remainder-note{font-size:8px;line-height:1.3;gap:2px;margin-top:2px}
-  .comparison-composition .composition-subheading{font-size:11px}
+  .comparison-composition .composition-subheading{font-size:10px}
   .comparison-composition .composition-denominator{font-size:9px;margin-top:1px}
-  .comparison-composition .stack-detail{grid-template-columns:19px minmax(0,1fr);gap:7px;margin-top:5px;min-height:116px}
-  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:116px}
+  .comparison-composition .stack-detail{grid-template-columns:17px minmax(0,1fr);gap:6px;margin-top:4px;min-height:90px}
+  .comparison-composition .composition-stack,.comparison-composition .composition-labels{height:90px}
   .comparison-composition .composition-stack{border-radius:3px}
-  .comparison-composition .composition-row{grid-template-columns:minmax(0,83px) minmax(0,1fr);gap:6px;font-size:9px;line-height:1.25}
+  .comparison-composition .composition-row{grid-template-columns:minmax(0,88px) minmax(0,1fr);gap:5px;font-size:9px;line-height:1.25}
   .comparison-composition .composition-label{gap:3px;flex-wrap:nowrap}
   .comparison-composition .legend-dot{width:6px;height:6px;flex-basis:6px}
   .comparison-composition .composition-amount{max-width:none;font-size:9px}
-  .comparison-composition .raw-material-summary{grid-template-columns:minmax(0,109px) minmax(0,1fr);gap:6px;margin-top:6px;padding-top:5px;font-size:9px;line-height:1.3}
+  .comparison-composition .raw-material-summary{grid-template-columns:minmax(0,111px) minmax(0,1fr);gap:5px;margin-top:4px;padding-top:4px;font-size:9px;line-height:1.3}
   .comparison-composition .raw-material-total{font-size:9px}
   .comparison-composition .composition-status{font-size:8px;line-height:1.3;margin:0}
   .comparison-composition,.composition-donut,.composition-stack,.legend-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}

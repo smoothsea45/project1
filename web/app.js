@@ -419,8 +419,11 @@
     $('comparison-body').closest('table').style.width = (166 + project.scenarios.length * 340) + 'px';
     const header = element('tr');
     const itemHeader = element('th', '비교 항목', 'row-label');
-    itemHeader.rowSpan = 2; itemHeader.scope = 'col'; header.append(itemHeader);
+    itemHeader.scope = 'col'; header.append(itemHeader);
     const unitHeader = element('tr', undefined, 'comparison-unit-header');
+    unitHeader.dataset.comparisonField = 'cost_basis';
+    const costHeader = element('th', '비용 구분', 'row-label');
+    costHeader.scope = 'row'; unitHeader.append(costHeader);
     for (const s of project.scenarios) {
       const th = element('th', s.name, s.id === project.active_scenario_id ? 'current' : '');
       th.scope = 'colgroup'; th.colSpan = 2; th.dataset.scenarioId = s.id; header.append(th);
@@ -430,7 +433,7 @@
         unitHeader.append(unit);
       }
     }
-    $('comparison-head').append(header, unitHeader);
+    $('comparison-head').append(header);
     const results = project.scenarios.map(s => E.calculate(s));
     const apiDetails = (s, value) => {
       const list = element('div', undefined, 'comparison-api-list');
@@ -466,6 +469,7 @@
       ['labor_cost', '공수비', (s, r) => [s.batch_labor, r.labor_unit]]
     ];
     for (const [field, label, value] of rows) {
+      if (field === 'api_cost') $('comparison-body').append(unitHeader);
       const tr = element('tr'); tr.dataset.comparisonField = field;
       if (['price', 'total_cost', 'cost_rate'].includes(field)) tr.className = 'emphasis-row';
       if (field === 'composition') tr.className = 'comparison-chart-row';

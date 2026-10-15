@@ -5,10 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=5">
+  <link rel="stylesheet" href="styles.css?v=6">
   <script defer src="vendor/decimal.js"></script>
-  <script defer src="engine.js?v=5"></script>
-  <script defer src="app.js?v=5"></script>
+  <script defer src="engine.js?v=6"></script>
+  <script defer src="app.js?v=6"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -110,11 +110,6 @@
     <section id="tab-results" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-results" hidden>
       <div class="results-heading"><div><h2>현재 시나리오 계산 결과</h2><p>모든 비용은 제조수율을 반영한 1T 기준입니다.</p></div></div>
       <div class="results-layout">
-      <div class="metric-grid">
-        <article class="metric-card"><span class="metric-label">약가</span><div><strong id="result-price">—</strong><span class="metric-unit">원/T</span></div><p id="pricing-source">사용자 입력값</p></article>
-        <article class="metric-card"><span class="metric-label">제조원가</span><div><strong id="result-cost">—</strong><span class="metric-unit">원/T</span></div><p id="batch-total-note">원료비 + 포자재비 + 공수비</p></article>
-        <article class="metric-card featured"><span class="metric-label">원가율</span><div><strong id="result-rate">—</strong><span class="metric-unit">%</span></div><p>보험약가 대비 · 100% 초과도 표시</p></article>
-      </div>
       <div class="results-detail-grid">
         <section class="card composition-card" aria-labelledby="composition-heading">
           <div class="section-heading"><h2 id="composition-heading">비용 구성</h2><span class="section-note">원/T</span></div>
@@ -139,6 +134,11 @@
           </div>
           <p id="composition-status" data-chart-part="status" class="composition-status" role="status" hidden></p>
         </section>
+      </div>
+      <div class="metric-grid">
+        <article class="metric-card"><span class="metric-label">약가</span><div><strong id="result-price">—</strong><span class="metric-unit">원/T</span></div><p id="pricing-source">사용자 입력값</p></article>
+        <article class="metric-card"><span class="metric-label">제조원가</span><div><strong id="result-cost">—</strong><span class="metric-unit">원/T</span></div><p id="batch-total-note">원료비 + 포자재비 + 공수비</p></article>
+        <article class="metric-card featured"><span class="metric-label">원가율</span><div><strong id="result-rate">—</strong><span class="metric-unit">%</span></div><p>보험약가 대비 · 100% 초과도 표시</p></article>
       </div>
       </div>
     </section>
