@@ -319,7 +319,7 @@ def test_result_chart_is_larger_and_amounts_stay_close_to_labels(page, width):
 def test_pricing_choice_rows_align_within_each_group(page):
     # Long labels should wrap inside equally sized controls, without shifting radio buttons.
     for group in [".company-group", ".drug-subgroup", ".supply-group", ".count-group"]:
-        choices = page.locator(group).first.locator(".choice")
+        choices = page.locator(group).first.locator(".choice:visible")
         boxes = [choice.bounding_box() for choice in choices.all()]
         assert len(boxes) >= 2
         assert max(box["x"] for box in boxes) - min(box["x"] for box in boxes) <= 1

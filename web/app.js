@@ -19,18 +19,12 @@
   try {
     const draft = localStorage.getItem(STORAGE_KEY);
     if (draft) {
-      project = useManualPricing(E.parseProject(draft));
-      loadNotice = '이 브라우저에 저장된 초안을 복원했습니다. 약가는 직접 입력값을 사용합니다.';
+      project = E.parseProject(draft);
+      loadNotice = '이 브라우저에 저장된 초안을 복원했습니다.';
     }
   } catch (error) {
     storageAvailable = false;
     loadNotice = '기존 브라우저 초안을 그대로 보관했습니다. 복원할 수 없습니다: ' + error.message;
-  }
-
-  function useManualPricing(value) {
-    // The current screen supports direct pricing only; preserve all entered amounts.
-    value.scenarios.forEach(s => { s.pricing_mode = 'manual'; });
-    return value;
   }
 
   function active() { return project.scenarios.find(s => s.id === project.active_scenario_id); }
@@ -158,6 +152,13 @@
       else input.value = value === null || value === undefined ? '' : value;
     });
     document.querySelectorAll('[data-pricing-flag]').forEach(input => { input.checked = s.pricing_flags.includes(input.dataset.pricingFlag); });
+    document.querySelectorAll('[data-pricing-field]').forEach(input => {
+      const value = s.pricing_conditions[input.dataset.pricingField];
+      if (input.type === 'checkbox') input.checked = value;
+      else if (input.type === 'radio') input.checked = value === input.value;
+      else if (input.inputMode === 'decimal') setNumericDisplay(input, value);
+      else input.value = value === null || value === undefined ? '' : value;
+    });
   }
   function renderScenarioTabs() {
     $('scenario-tabs').replaceChildren();
@@ -251,7 +252,7 @@
     $('example-banner').hidden = !project.is_example;
   }
   function markValidation(result) {
-    document.querySelectorAll('[data-field],[data-material-field]').forEach(input => { input.removeAttribute('aria-invalid'); input.removeAttribute('title'); });
+    document.querySelectorAll('[data-field],[data-material-field],[data-pricing-field]').forEach(input => { input.removeAttribute('aria-invalid'); input.removeAttribute('title'); });
     $('material-body').querySelectorAll('tr').forEach(tr => tr.classList.remove('invalid-row'));
     for (const issue of result.issues) {
       let input;
@@ -260,7 +261,8 @@
         const tr = [...$('material-body').children].find(row => row.dataset.materialId === id);
         input = tr && tr.querySelector('[data-material-field="' + field + '"]');
         if (tr && issue.severity === 'error') tr.classList.add('invalid-row');
-      } else input = document.querySelector('[data-field="' + issue.path + '"]');
+      } else if (issue.path.startsWith('pricing_conditions.')) input = document.querySelector('[data-pricing-field="' + issue.path.split('.')[1] + '"]');
+      else input = document.querySelector('[data-field="' + issue.path + '"]');
       if (input) {
         if (issue.severity === 'error') input.setAttribute('aria-invalid', 'true');
         input.title = issue.message;
@@ -302,10 +304,148 @@
     renderPricing(result.pricing); renderComposition(result); renderComparison();
   }
   function renderPricing(pricing) {
-    $('pricing-status').textContent = '사용자 입력값';
-    $('pricing-status').className = 'status-pill success';
-    $('pricing-source').textContent = pricing.source;
-    $('pricing-input-note').textContent = '가산 조건은 기록만 합니다. 원가율에는 직접 입력한 우리 제품 예상 약가를 사용합니다.';
+    const s = active();
+    const p = s.pricing_conditions;
+    const automatic = s.pricing_mode === 'official';
+    const general = p.general_category !== 'none';
+    $('manual-price-wrap').hidden = automatic;
+    $('manual-price').disabled = automatic;
+    $('calculated-price-wrap').hidden = !automatic;
+    $('calculated-price').textContent = format(pricing.amount, 2, '계산 불가');
+    $('selected-pricing-year').textContent = '선택 연차: ' + p.selected_year + '년차';
+    $('pricing-company-details').hidden = general || !s.company_type || s.company_type === 'general';
+    $('pricing-supply-details').hidden = p.supply_category === 'none';
+    $('pricing-supply-special').hidden = p.supply_category !== 'own_injectable_pediatric';
+    $('pricing-general-details').hidden = !general;
+    const allowedTypes = p.general_category === 'biologic' ? ['biosimilar'] : p.general_category === 'improved' ? ['salt_isomer', 'new_form', 'new_dose', 'combination'] : ['salt_isomer', 'new_form', 'new_dose'];
+    const subtype = document.querySelector('[data-pricing-field="general_subtype"]');
+    for (const option of subtype.options) {
+      option.disabled = option.value !== '' && !allowedTypes.includes(option.value);
+      option.hidden = option.disabled;
+    }
+    const dataPath = general && ['salt_isomer', 'new_form', 'new_dose'].includes(p.general_subtype);
+    const generalBonus = dataPath && p.general_same_reference;
+    const detailVisibility = {
+      general_base: dataPath,
+      general_same_reference: dataPath,
+      general_first_listed: dataPath,
+      general_dose_equivalent: dataPath,
+      general_target_biologic: dataPath,
+      general_reference_own: dataPath,
+      general_recognized: dataPath,
+      general_trigger_date: generalBonus,
+      general_extension: generalBonus,
+      general_long_extension: Boolean(generalBonus && p.general_extension && p.general_recognized),
+      general_cap: Boolean(generalBonus && p.general_extension && !p.general_recognized),
+      company_eligible: !general,
+      domestic_extension: !general
+    };
+    for (const [field, visible] of Object.entries(detailVisibility)) {
+      const wrapper = document.querySelector('[data-pricing-detail="' + field + '"]');
+      if (wrapper) wrapper.hidden = !visible;
+    }
+    // Disabled inputs cannot receive clicks, focus, or keyboard edits in manual mode.
+    document.querySelectorAll('[data-pricing-automatic]').forEach(input => {
+      const hidden = input.closest('[hidden]');
+      const field = input.dataset.pricingField;
+      const parentUnmet = field === 'domestic_extension' ? !p.company_eligible
+        : field === 'supply_extension' ? !p.supply_eligible || (p.supply_category === 'own_injectable_pediatric' && !p.supply_detail_eligible)
+          : false;
+      input.disabled = !automatic || parentUnmet || Boolean(hidden && document.querySelector('.pricing-card').contains(hidden));
+    });
+    $('pricing-general-input-note').textContent = p.general_category === 'biologic'
+      ? '생물의약품은 기등재 여부·개발목표제품·최초등재 등 별도 산정경로 확인이 필요합니다. 일반 제네릭 산정률을 대신 적용하지 않습니다.'
+      : p.general_subtype === 'combination'
+        ? '복합제는 성분별 비교 기준금액과 해당 산정경로가 필요합니다. 현재 입력으로 임의의 기본약가를 만들지 않습니다.'
+        : '개발목표제품의 상한금액과 동등 투약비용을 확인하세요. 가산 기산일이 등재일과 다른 경로는 추가 확인이 필요합니다.';
+    $('pricing-migration-notice').hidden = !p.migration_review;
+    $('pricing-migration-message').textContent = p.migration_review;
+    $('pricing-review-legacy').disabled = !automatic;
+    $('pricing-status').textContent = !automatic ? '사용자 입력값' : pricing.status === 'ready' ? '예상 약가' : pricing.status === 'needs_conditions' ? '추가 산정조건 필요' : '입력 확인';
+    $('pricing-status').className = 'status-pill' + ((!automatic || pricing.status === 'ready') ? ' success' : '');
+    $('pricing-source').textContent = pricing.source + (automatic ? ' · ' + p.selected_year + '년차' : '');
+    $('pricing-input-note').textContent = automatic
+      ? '선택한 조건으로 계산한 연차별 예상 약가를 사용합니다. 막대를 선택하면 해당 연차의 약가가 원가계산에 반영됩니다.'
+      : '직접 입력한 우리 제품 약가를 원가계산에 사용합니다.';
+    renderPricingForecast(pricing, automatic);
+  }
+  function renderPricingForecast(pricing, automatic) {
+    $('pricing-forecast').hidden = !automatic;
+    const bars = $('pricing-year-bars');
+    const axis = $('pricing-y-axis');
+    bars.replaceChildren(); axis.replaceChildren();
+    $('pricing-forecast-summary').textContent = '';
+    $('pricing-forecast-context').textContent = '선택한 조건과 제도 유지 가정에 따른 예상치';
+    $('pricing-calculation-details').replaceChildren();
+    const years = pricing.years || [];
+    const ready = automatic && ['ready', 'zero'].includes(pricing.status) && years.length === 10;
+    $('pricing-forecast-chart').hidden = !ready;
+    $('pricing-forecast-message').hidden = ready;
+    if (!ready) {
+      const messages = currentResult.issues.filter(issue => /^(pricing_|original_price|company_type|identical_count_band)/.test(issue.path)).map(issue => issue.message);
+      $('pricing-forecast-message').textContent = [...new Set(messages)].join(' ') || pricing.summary || '';
+      if (!$('pricing-forecast-message').textContent.trim()) $('pricing-forecast-message').textContent = '오리지널 기준약가, 기준요건, 품목 수와 예상 등재일을 확인해 주세요.';
+      return;
+    }
+    const groups = [];
+    for (const year of years) {
+      const last = groups[groups.length - 1];
+      if (last && last.amount.eq(year.amount) && last.assumption === year.assumption) last.end = year.year;
+      else groups.push({start: year.year, end: year.year, amount: year.amount, assumption: year.assumption});
+    }
+    $('pricing-forecast-summary').textContent = groups.map(group => group.start + (group.end === group.start ? '' : '~' + group.end) + '년차 ' + format(group.amount) + '원' + (group.assumption ? ' (연장요건 충족 가정)' : '')).join(' → ');
+    const s = active();
+    const company = {general: '일반기업', innovative: '혁신형 제약기업', near: '준혁신형 제약기업', supply_leader: '수급안정 선도기업'}[s.company_type];
+    $('pricing-forecast-context').textContent = [company, s.pricing_conditions.general_category === 'none' ? '최초 제네릭 등재군' : '별도 기본 산정경로', s.identical_count_band === 'ge14' ? '14개 이상 유발' : s.identical_count_band === 'lt14' ? '14개 미만' : ''].filter(Boolean).join(' · ');
+    let maximum = new D(0);
+    years.forEach(year => { if (year.amount.gt(maximum)) maximum = year.amount; });
+    const scale = maximum.gt(0) ? maximum.mul('1.18') : new D(1);
+    for (const step of [4, 3, 2, 1, 0]) axis.append(element('span', format(scale.mul(step).div(4), 0)));
+    for (const year of years) {
+      const selected = year.year === active().pricing_conditions.selected_year;
+      const button = element('button', undefined, 'pricing-year-button' + (selected ? ' selected' : '') + (year.kind === 'bonus' ? ' bonus' : '') + (year.assumption ? ' extension' : ''));
+      button.type = 'button';
+      button.dataset.pricingYear = year.year;
+      button.dataset.amount = year.amount.toString();
+      button.setAttribute('aria-pressed', String(selected));
+      const amount = format(year.amount);
+      const tooltip = year.year + '년차 · ' + amount + ' 원/T · ' + year.start_date + '~' + year.end_date + '\n' + (year.label || '') + (year.rate_label ? ' · ' + year.rate_label : '') + (year.assumption ? ' · 연장요건 충족 가정' : '');
+      button.title = tooltip;
+      button.setAttribute('aria-label', tooltip);
+      const column = element('span', undefined, 'pricing-year-column');
+      const fill = element('span', undefined, 'pricing-year-fill');
+      const height = year.amount.div(scale).mul(100).toNumber() + '%';
+      column.style.setProperty('--bar-height', height);
+      fill.style.height = height;
+      fill.setAttribute('aria-hidden', 'true');
+      column.append(element('span', amount, 'pricing-year-amount'), fill);
+      const label = element('span', undefined, 'pricing-year-label');
+      label.append(element('strong', String(year.calendar_year)), element('small', year.year + '년차'));
+      button.append(column, label);
+      button.addEventListener('click', () => {
+        active().pricing_conditions.selected_year = year.year;
+        changed();
+        const replacement = bars.querySelector('[data-pricing-year="' + year.year + '"]');
+        if (replacement) replacement.focus({preventScroll: true});
+      });
+      bars.append(button);
+    }
+    const details = $('pricing-calculation-details');
+    const effective = pricing.effective_requirements;
+    if (effective && active().pricing_conditions.general_category === 'none') {
+      details.append(element('p', '실제 적용 기준요건: 생동·임상 ' + (effective.own_data ? '충족' : '미충족') + ' · DMF ' + (effective.dmf ? '충족' : '미충족') + ' (' + effective.count + '개)'));
+      for (const reason of effective.deemed_reasons || []) details.append(element('p', reason));
+    }
+    for (const step of pricing.steps || []) details.append(element('p', step));
+    for (const note of pricing.notes || []) details.append(element('p', note));
+    if (pricing.regulation) {
+      const source = element('p');
+      source.append(document.createTextNode('적용 기준: ' + pricing.regulation + ' · ' + pricing.basis_date + ' (사용자 지정 기준일) · '));
+      const link = element('a', '공식 별표 1');
+      link.href = 'https://www.law.go.kr/LSW/flDownload.do?bylClsCd=200201&flSeq=168756835';
+      link.target = '_blank'; link.rel = 'noopener noreferrer';
+      source.append(link); details.append(source);
+    }
   }
   function renderComposition(result, root = document.querySelector('.composition-card')) {
     const parts = {
@@ -552,8 +692,30 @@
     input.addEventListener(event, () => {
       if (input.type === 'radio' && !input.checked) return;
       active()[input.dataset.field] = input.value;
+      if (input.dataset.field === 'pricing_mode' && input.value === 'official') active().pricing_conditions.selected_year = 1;
       changed();
     });
+  });
+  document.querySelectorAll('[data-pricing-field]').forEach(input => {
+    const field = input.dataset.pricingField;
+    if (input.inputMode === 'decimal') {
+      bindNumericInput(input, value => { active().pricing_conditions[field] = value; changed(); });
+      return;
+    }
+    const event = input.type === 'checkbox' || input.type === 'radio' || input.tagName === 'SELECT' ? 'change' : 'input';
+    input.addEventListener(event, () => {
+      if (input.type === 'radio' && !input.checked) return;
+      active().pricing_conditions[field] = input.type === 'checkbox' ? input.checked : input.value;
+      if (field === 'general_category') {
+        active().pricing_conditions.general_subtype = '';
+        document.querySelector('[data-pricing-field="general_subtype"]').value = '';
+      }
+      changed();
+    });
+  });
+  $('pricing-review-legacy').addEventListener('click', () => {
+    active().pricing_conditions.migration_review = '';
+    changed();
   });
   document.querySelectorAll('[data-pricing-flag]').forEach(input => input.addEventListener('change', () => {
     active().pricing_flags = [...document.querySelectorAll('[data-pricing-flag]:checked')].map(node => node.dataset.pricingFlag);
@@ -598,7 +760,7 @@
     const file = event.target.files[0]; event.target.value = ''; if (!file) return;
     try {
       if (file.size > 16 * 1024 * 1024) throw new Error('프로젝트 파일은 16MB 이하여야 합니다.');
-      const loaded = useManualPricing(E.parseProject(await file.text()));
+      const loaded = E.parseProject(await file.text());
       if (!(await confirmDiscard())) return;
       project = loaded; dirty = false; renderAll(); persistDraft(); updateStatus(); showToast('프로젝트를 열었습니다: ' + file.name);
     } catch (error) { showToast('파일을 열 수 없습니다: ' + error.message); }

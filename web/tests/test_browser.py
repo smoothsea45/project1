@@ -128,36 +128,36 @@ def test_tabs_are_named_buttons_and_work_with_keyboard(page):
     expect(page.locator("#product-name")).to_be_focused()
 
 
-def test_pricing_choices_on_left_prices_on_right_and_drug_additions_are_independent(page):
+def test_pricing_choices_on_left_prices_on_right_and_drug_groups_are_independent(page):
     setup_base(page)
-    choices = page.locator('[data-pricing-flag]')
-    expect(choices).to_have_count(6)
-    for choice in choices.all():
-        expect(choice).to_have_attribute("type", "checkbox")
-    page.locator('[data-pricing-flag="originator_data"]').check()
-    expect(page.locator('[data-pricing-flag="originator_data"]')).to_be_checked()
-    page.locator('[data-pricing-flag="domestic_essential"]').check()
-    expect(page.locator('[data-pricing-flag="originator_data"]')).to_be_checked()
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(2)
-    assert scenario(page)["pricing_flags"] == ["originator_data", "domestic_essential"]
-    page.locator('[data-pricing-flag="originator_data"]').uncheck()
-    assert scenario(page)["pricing_flags"] == ["domestic_essential"]
+    page.locator('[data-field="pricing_mode"][value="official"]').check()
+    general = page.locator('[data-pricing-field="general_category"]')
+    supply = page.locator('[data-pricing-field="supply_category"]')
+    expect(general).to_have_count(4)
+    expect(supply).to_have_count(4)
+    for choice in general.all() + supply.all():
+        expect(choice).to_have_attribute("type", "radio")
+    page.locator('[data-pricing-field="general_category"][value="data_submission"]').check()
+    page.locator('[data-pricing-field="supply_category"][value="domestic_essential"]').check()
+    expect(page.locator('[data-pricing-field="general_category"]:checked')).to_have_count(1)
+    expect(page.locator('[data-pricing-field="supply_category"]:checked')).to_have_count(1)
+    assert scenario(page)["pricing_conditions"]["general_category"] == "data_submission"
+    assert scenario(page)["pricing_conditions"]["supply_category"] == "domestic_essential"
     page.locator('[name="company-type"][value="near"]').check()
     page.locator('[name="identical-count-band"][value="ge14"]').check()
     assert scenario(page)["company_type"] == "near"
     assert scenario(page)["identical_count_band"] == "ge14"
     expect(page.locator("#target-rate")).to_have_count(0)
-    # The common choices occupy the left column; the amount fields occupy the right.
     original_box = page.locator("#original-price").bounding_box()
-    manual_box = page.locator("#manual-price").bounding_box()
+    calculated_box = page.locator("#calculated-price").bounding_box()
     for selector in [
         '[name="company-type"][value="near"]',
-        '[data-pricing-flag="domestic_essential"]',
+        '[data-pricing-field="supply_category"][value="domestic_essential"]',
         '[name="identical-count-band"][value="ge14"]',
     ]:
         choice_box = page.locator(selector).bounding_box()
         assert choice_box["x"] < original_box["x"]
-        assert choice_box["x"] < manual_box["x"]
+        assert choice_box["x"] < calculated_box["x"]
 
 
 def test_root_entry_redirects_into_working_ui(page, site_url):
@@ -257,7 +257,6 @@ def test_large_inputs_format_commas_without_changing_numeric_data(page):
     fields = [
         ("#batch-size", "batch_size", "100000", "100,000"),
         ("#exchange-rate", "exchange_rate", "1350", "1,350"),
-        ("#original-price", "original_price", "125000", "125,000"),
         ("#manual-price", "manual_price", "300000", "300,000"),
         ("#batch-packaging", "batch_packaging", "1000000", "1,000,000"),
         ("#batch-labor", "batch_labor", "2000000", "2,000,000"),
@@ -266,10 +265,12 @@ def test_large_inputs_format_commas_without_changing_numeric_data(page):
         page.locator(selector).fill(value)
         expect(page.locator(selector)).to_have_value(displayed)
         assert scenario(page)[key] == value
-    page.locator(".secondary-price summary").click()
-    page.locator("#post-price").fill("250000")
-    expect(page.locator("#post-price")).to_have_value("250,000")
-    assert scenario(page)["post_price"] == "250000"
+    page.locator('[data-field="pricing_mode"][value="official"]').check()
+    page.locator("#original-price").fill("125000")
+    expect(page.locator("#original-price")).to_have_value("125,000")
+    assert scenario(page)["original_price"] == "125000"
+    page.locator('[data-field="pricing_mode"][value="manual"]').check()
+    expect(page.locator("#post-price, .secondary-price")).to_have_count(0)
     row = add_material(page, amount="1234.5000")
     expect(row.locator('[data-material-field="amount"]')).to_have_value("1,234.5000")
     expect(row.locator('[data-material-field="price"]')).to_have_value("1,000,000")
@@ -408,29 +409,35 @@ def test_cloned_scenario_keeps_original_and_compares_side_by_side(page):
     expect(page.locator("#yield-percent")).to_have_value("100")
 
 
-def test_manual_price_is_fixed_beside_pricing_title_and_loaded_automatic_mode_uses_manual(page, tmp_path):
+def test_pricing_mode_is_beside_title_and_loaded_automatic_mode_uses_calculated_price(page, tmp_path):
     setup_base(page)
     add_material(page)
-    page.locator("#original-price").fill("600")
-    page.locator('[name="company-type"][value="innovative"]').check()
-    page.locator('[data-pricing-flag="api_self"]').check()
-    expect(page.locator("#pricing-mode")).to_have_count(0)
-    manual_option = page.get_by_role("radio", name="약가 직접 입력", exact=True)
+    manual_option = page.locator('[data-field="pricing_mode"][value="manual"]')
     expect(manual_option).to_be_checked()
     expect(page.locator("#manual-price")).to_be_enabled()
     heading = page.locator("#pricing-heading").bounding_box()
     mode = manual_option.bounding_box()
     assert mode["x"] >= heading["x"] + heading["width"]
     assert abs(mode["y"] - heading["y"]) <= 24
-    payload = save_file(page, tmp_path / "manual.json")
-    payload["scenarios"][0]["pricing_mode"] = "official"
-    open_file(page, {"name": "existing-auto.json", "mimeType": "application/json", "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8")})
-    assert scenario(page)["pricing_mode"] == "manual"
+    page.locator('[data-field="pricing_mode"][value="official"]').check()
+    page.locator("#original-price").fill("1000")
+    page.locator('[name="company-type"][value="general"]').check()
+    page.locator('[name="identical-count-band"][value="lt14"]').check()
+    page.locator('[data-pricing-field="own_data"]').check()
+    page.locator('[data-pricing-field="dmf"]').check()
+    page.locator('[data-pricing-field="listing_date"]').fill("2027-09-01")
+    path = tmp_path / "automatic.json"
+    saved = save_file(page, path)
+    new_project(page)
+    open_file(page, path)
+    assert project(page) == saved
+    assert scenario(page)["pricing_mode"] == "official"
     results(page)
     expect(page.locator("#result-cost")).to_have_text("50.00")
-    expect(page.locator("#result-price")).to_have_text("300.00")
-    expect(page.locator("#pricing-source")).to_have_text("사용자 입력값")
-    expect(page.locator("#result-rate")).to_have_text("16.7")
+    expect(page.locator("#result-price")).to_have_text("450.00")
+    expect(page.locator("#pricing-source")).to_contain_text("1년차")
+    expect(page.locator("#result-rate")).to_have_text("11.1")
+    assert scenario(page)["manual_price"] == "300"
 
 
 @pytest.mark.parametrize("price", ["", "0"])
@@ -479,27 +486,27 @@ def test_rate_over_100_retained_without_pricing_basis_or_goal_metrics(page):
     setup_base(page)
     add_material(page)
     page.locator("#manual-price").fill("25")
-    page.locator(".secondary-price summary").click()
-    page.locator("#post-price").fill("20")
+    expect(page.locator("#post-price, .secondary-price")).to_have_count(0)
     results(page)
     expect(page.locator("#result-rate")).to_have_text("200.0")
     expect(page.locator("#result-post-rate, #pricing-rule, #pricing-date, #pricing-steps")).to_have_count(0)
-    assert scenario(page)["post_price"] == "20"
+    assert scenario(page)["post_price"] is None
     expect(page.locator("#target-rate, #result-gap, #result-savings, #result-target-status")).to_have_count(0)
     comparison(page)
     assert "목표" not in page.locator("#comparison-body").inner_text()
 
 
-def test_json_download_open_restores_flags_product_and_scenarios(page, tmp_path):
+def test_json_download_open_restores_pricing_conditions_product_and_scenarios(page, tmp_path):
     setup_base(page)
     add_material(page)
     page.locator("#product-notes").fill("캡슐·함량은 비고에 기록")
+    page.locator('[data-field="pricing_mode"][value="official"]').check()
     page.locator('[name="company-type"][value="near"]').check()
     page.locator('[name="identical-count-band"][value="ge14"]').check()
-    flags = ["originator_data", "improved", "biologic", "api_self", "domestic_essential", "own_injectable_pediatric"]
-    for flag in flags:
-        page.locator(f'[data-pricing-flag="{flag}"]').check()
-    assert scenario(page)["pricing_flags"] == flags
+    page.locator('[data-pricing-field="general_category"][value="improved"]').check()
+    page.locator('[data-pricing-field="supply_category"][value="api_self"]').check()
+    page.locator('[data-pricing-field="supply_eligible"]').check()
+    page.locator('[data-pricing-field="own_data"]').check()
     page.once("dialog", lambda dialog: dialog.accept("비교안"))
     page.locator("#clone-scenario").click()
     page.locator("#yield-percent").fill("98")
@@ -512,16 +519,18 @@ def test_json_download_open_restores_flags_product_and_scenarios(page, tmp_path)
     expect(page.locator("#product-name")).to_have_value("검증 제품")
     expect(page.locator('#scenario-tabs [role="tab"]')).to_have_count(2)
     expect(page.locator("#yield-percent")).to_have_value("98")
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(6)
-    for flag in flags:
-        expect(page.locator(f'[data-pricing-flag="{flag}"]')).to_be_checked()
+    expect(page.locator('[data-pricing-field="general_category"][value="improved"]')).to_be_checked()
+    expect(page.locator('[data-pricing-field="supply_category"][value="api_self"]')).to_be_checked()
+    expect(page.locator('[data-pricing-field="supply_eligible"]')).to_be_checked()
     assert project(page) == expected
 
 
-def test_legacy_multiple_drug_additions_restore_without_blocking_save(page, tmp_path):
+def test_legacy_multiple_drug_additions_are_preserved_with_review_notice(page, tmp_path):
     setup_base(page)
     add_material(page)
     payload = save_file(page, tmp_path / "before.json")
+    payload["schema_version"] = 1
+    payload["scenarios"][0].pop("pricing_conditions")
     payload["scenarios"][0]["pricing_flags"] = ["originator_data", "api_self"]
     open_file(page, {
         "name": "legacy-additions.json",
@@ -529,15 +538,21 @@ def test_legacy_multiple_drug_additions_restore_without_blocking_save(page, tmp_
         "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8"),
     })
     expect(page.locator("#input-errors")).to_be_hidden()
-    expect(page.locator('[data-pricing-flag]:checked')).to_have_count(2)
+    expect(page.locator("#pricing-migration-notice")).to_be_visible()
+    expect(page.locator("#pricing-migration-message")).to_contain_text("다시 확인")
     assert scenario(page)["pricing_flags"] == ["originator_data", "api_self"]
+    assert scenario(page)["pricing_conditions"]["general_category"] == "none"
+    assert scenario(page)["pricing_conditions"]["supply_category"] == "api_self"
     saved = save_file(page, tmp_path / "multiple.json")
     assert saved["scenarios"][0]["pricing_flags"] == ["originator_data", "api_self"]
-    page.locator('[data-pricing-flag="originator_data"]').uncheck()
-    expect(page.locator("#input-errors")).to_be_hidden()
-    assert scenario(page)["pricing_flags"] == ["api_self"]
-    saved = save_file(page, tmp_path / "resolved.json")
-    assert saved["scenarios"][0]["pricing_flags"] == ["api_self"]
+    page.locator('[data-field="pricing_mode"][value="official"]').check()
+    expect(page.locator("#calculated-price")).to_have_text("계산 불가")
+    expect(page.locator('[data-pricing-year]')).to_have_count(0)
+    page.locator("#pricing-review-legacy").click()
+    expect(page.locator("#pricing-migration-notice")).to_be_hidden()
+    assert scenario(page)["pricing_conditions"]["migration_review"] == ""
+    saved = save_file(page, tmp_path / "reviewed.json")
+    assert saved["scenarios"][0]["pricing_flags"] == ["originator_data", "api_self"]
 
 
 @pytest.mark.parametrize(

@@ -182,10 +182,12 @@ test('cost rate above 100 is not clamped; negative target gap is allowed', () =>
   equal(result.required_saving, '0');
 });
 
-test('post-addition price uses the same cost and independently validated price', () => {
+test('legacy post-addition price is retained but neither pricing mode uses it', () => {
   const result = E.calculate(scenario({ manual_price: '100', post_price: '50' }));
   equal(result.cost_rate, '20');
-  equal(result.post_rate, '40');
+  assert.equal(result.post_rate, null);
+  const project = E.makeProject({ scenarios: [scenario({ post_price: '50' })] });
+  assert.equal(E.parseProject(E.serializeProject(project)).scenarios[0].post_price, '50');
 });
 
 test('invalid fixed cost does not produce an apparently complete total', () => {
@@ -254,6 +256,7 @@ test('rejecting the fifth scenario does not generate any new IDs', () => {
   const sandbox = { console, Date, Math, crypto: { randomUUID: () => { generatedIds += 1; return 'generated-' + generatedIds; } } };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../vendor/decimal.js'), 'utf8'), sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../pricing.js'), 'utf8'), sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../engine.js'), 'utf8'), sandbox);
   const project = E.makeProject({ scenarios: Array.from({ length: 4 }, (_, index) => scenario({ name: '안 ' + index })) });
   const before = JSON.stringify(project);
@@ -318,7 +321,7 @@ test('JSON save/load preserves all pricing conditions and independent scenarios'
   assert.deepEqual(loaded, project);
   equal(E.calculate(loaded.scenarios[0]).total_cost, '80');
   assert.equal(loaded.format, 'pharma-cost-web-project');
-  assert.equal(loaded.schema_version, 1);
+  assert.equal(loaded.schema_version, E.VERSION);
 });
 
 test('new scenarios have an empty packaging form while the editable example has one', () => {
@@ -351,14 +354,16 @@ test('JSON roundtrip preserves distinct packaging forms, Unicode and multiline t
 
 test('existing schema version 1 files and browser drafts normalize missing packaging forms', () => {
   const legacy = E.createExampleProject();
-  legacy.scenarios.forEach(item => { delete item.packaging_form; });
+  legacy.schema_version = 1;
+  legacy.scenarios.forEach(item => { delete item.packaging_form; delete item.pricing_conditions; });
   const before = JSON.stringify(legacy);
   const loaded = E.parseProject(before);
-  assert.equal(loaded.schema_version, 1);
+  assert.equal(loaded.schema_version, E.VERSION);
   assert.ok(loaded.scenarios.every(item => item.packaging_form === ''));
   assert.equal(JSON.stringify(legacy), before);
   const withoutAddedField = JSON.parse(JSON.stringify(loaded));
-  withoutAddedField.scenarios.forEach(item => { delete item.packaging_form; });
+  withoutAddedField.schema_version = 1;
+  withoutAddedField.scenarios.forEach(item => { delete item.packaging_form; delete item.pricing_conditions; });
   assert.deepEqual(withoutAddedField, legacy);
   equal(E.calculate(loaded.scenarios[0]).total_cost, '80');
   assert.deepEqual(E.parseProject(E.serializeProject(loaded)), loaded);
@@ -419,9 +424,9 @@ test('JSON malformed, version, unknown fields and legacy formats are clearly rej
   assert.throws(() => E.parseProject('null'), /프로젝트 객체/);
   assert.throws(() => E.parseProject(JSON.stringify({ schema_version: 1 })), /기존 데스크톱 JSON/);
   const project = E.createExampleProject();
-  project.schema_version = 2;
+  project.schema_version = E.VERSION + 1;
   assert.throws(() => E.parseProject(JSON.stringify(project)), /지원하지 않는 파일 버전/);
-  project.schema_version = 1;
+  project.schema_version = E.VERSION;
   project.product.project_name = 'Legacy field';
   assert.throws(() => E.parseProject(JSON.stringify(project)), /지원하지 않는 항목/);
 });
@@ -450,11 +455,11 @@ test('unsupported material units cannot silently use another conversion', () => 
   assert.throws(() => E.serializeProject(project), /단가 단위의 선택값/);
 });
 
-test('unverified official pricing never falls back to original or manual price', () => {
-  const result = E.calculate(scenario({ pricing_mode: 'official', original_price: '600', manual_price: '300', company_type: 'innovative', pricing_flags: ['improved'] }));
+test('unsupported general pricing never falls back to generic, original or manual price', () => {
+  const result = E.calculate(scenario({ pricing_mode: 'official', original_price: '600', manual_price: '300', company_type: 'innovative', pricing_flags: ['improved'], pricing_conditions: { listing_date: '2027-09-01', general_category: 'improved' } }));
   equal(result.total_cost, '20');
   assert.equal(result.pricing.amount, null);
-  assert.equal(result.pricing.status, 'unverified');
+  assert.equal(result.pricing.status, 'needs_conditions');
   assert.equal(result.cost_rate, null);
   assert.equal(result.required_saving, null);
 });
@@ -486,6 +491,7 @@ test('browser UMD runs with bundled decimal and has no CommonJS requirement', ()
   const sandbox = { console, Date, Math, crypto: { randomUUID: () => 'test-id' } };
   vm.createContext(sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../vendor/decimal.js'), 'utf8'), sandbox);
+  vm.runInContext(fs.readFileSync(path.join(__dirname, '../pricing.js'), 'utf8'), sandbox);
   vm.runInContext(fs.readFileSync(path.join(__dirname, '../engine.js'), 'utf8'), sandbox);
   assert.ok(sandbox.PharmaCost);
   assert.equal(sandbox.PharmaCost.calculate(sandbox.PharmaCost.createExampleProject().scenarios[0]).total_cost.toString(), '80');

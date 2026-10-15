@@ -1,18 +1,18 @@
 /* Offline domain model. No network, browser storage, or screen code belongs here. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) {
-    module.exports = factory(require('./vendor/decimal.js'));
+    module.exports = factory(require('./vendor/decimal.js'), require('./pricing.js'));
   } else {
-    root.PharmaCost = factory(root.Decimal);
+    root.PharmaCost = factory(root.Decimal, root.PharmaPricing);
   }
-}(typeof globalThis !== 'undefined' ? globalThis : this, function (DecimalLibrary) {
+}(typeof globalThis !== 'undefined' ? globalThis : this, function (DecimalLibrary, Pricing) {
   'use strict';
 
   if (!DecimalLibrary) throw new Error('오프라인 계산 라이브러리를 불러오지 못했습니다.');
   // A separate context keeps the UI's display preferences out of calculations.
   const Decimal = DecimalLibrary.clone({ precision: 256, rounding: DecimalLibrary.ROUND_HALF_UP });
   const FORMAT = 'pharma-cost-web-project';
-  const VERSION = 1;
+  const VERSION = 2;
   const MAX_SCENARIOS = 4;
   const SCENARIO_LIMIT_MESSAGE = '한 프로젝트의 시나리오는 최대 ' + MAX_SCENARIOS + '개까지 사용할 수 있습니다. 원본 데이터는 변경하지 않았습니다.';
   const UNITS = Object.freeze({
@@ -22,7 +22,7 @@
     usd_kg: { divisor: '1000000', foreign: true }
   });
   const FLAGS = Object.freeze(['originator_data', 'improved', 'biologic', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
-  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'materials'];
+  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'pricing_conditions', 'materials'];
   const MATERIAL_KEYS = ['id', 'kind', 'name', 'supplier', 'amount', 'price', 'price_unit'];
   const NUMBER_FIELDS = ['batch_size', 'yield_percent', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor'];
   const blank = value => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
@@ -45,16 +45,35 @@
       id: newId(), name: '기본안', batch_size: null, yield_percent: '100', packaging_form: '', exchange_rate: null,
       original_price: null, manual_price: null, post_price: null, target_rate: '20',
       batch_packaging: '0', batch_labor: '0', pricing_mode: 'manual', company_type: '',
-      identical_count_band: '', pricing_flags: [], materials: []
+      identical_count_band: '', pricing_flags: [], pricing_conditions: Pricing.makePricingConditions(), materials: []
     }, supplied);
     result.pricing_flags = [...result.pricing_flags];
+    result.pricing_conditions = Pricing.makePricingConditions(result.pricing_conditions);
     result.materials = result.materials.map(material => copy(material));
     return result;
   }
 
-  function normalizeScenario(scenario) {
+  function normalizeScenario(scenario, migratePricing) {
     // Version 1 projects and browser drafts created before this field remain usable.
-    if (scenario !== null && typeof scenario === 'object' && !Array.isArray(scenario) && !Object.prototype.hasOwnProperty.call(scenario, 'packaging_form')) scenario.packaging_form = '';
+    if (scenario !== null && typeof scenario === 'object' && !Array.isArray(scenario)) {
+      if (!Object.prototype.hasOwnProperty.call(scenario, 'packaging_form')) scenario.packaging_form = '';
+      if (migratePricing !== false && !Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) {
+        const conditions = Pricing.makePricingConditions();
+        const flags = Array.isArray(scenario.pricing_flags) ? scenario.pricing_flags : [];
+        const general = flags.filter(flag => ['originator_data', 'improved', 'biologic'].includes(flag));
+        const supply = flags.filter(flag => ['api_self', 'domestic_essential', 'own_injectable_pediatric'].includes(flag));
+        const notices = [];
+        if (general.length === 1 && general[0] !== 'originator_data') conditions.general_category = general[0];
+        if (supply.length === 1) conditions.supply_category = supply[0];
+        if (flags.length) notices.push('이전 파일의 가산 체크값은 원본 그대로 보존했습니다. 일반·수급안정 단일 선택 및 적용요건을 다시 확인해 주세요.');
+        if (scenario.company_type === 'near') {
+          scenario.company_type = '';
+          notices.push('이전의 준혁신형/수급안정 선도기업은 두 자격으로 분리되었습니다. 기업 유형을 다시 선택해 주세요.');
+        }
+        conditions.migration_review = notices.join(' ');
+        scenario.pricing_conditions = conditions;
+      }
+    }
     return scenario;
   }
 
@@ -159,11 +178,6 @@
     return result;
   }
 
-  /**
-   * Future official rules must be separately verified and injected by a trusted
-   * caller. They need {verified:true, regulation, basis_date, links, calculate}.
-   * calculate(scenario) returns {amount, steps}. No rate is assumed here.
-   */
   function assessPricing(scenario, ruleSet) {
     const issues = [];
     if (scenario.pricing_mode === 'manual') {
@@ -172,14 +186,16 @@
       else if (amount && amount.isZero()) issue(issues, 'manual_price', '약가가 0이어서 제조원가율을 계산할 수 없습니다.', 'warning');
       return {
         amount, source: '사용자 입력값', status: amount === null ? (blank(scenario.manual_price) ? 'missing' : 'invalid') : (amount.isZero() ? 'zero' : 'ready'),
-        regulation: null, basis_date: null,
+        regulation: null, basis_date: null, years: [], selected_year: null, summary: '', notes: [],
         steps: amount === null ? [] : ['우리 제품 예상 약가 직접 입력: ' + amount.toString() + ' 원/T'], links: [], issues
       };
     }
     if (scenario.pricing_mode !== 'official') {
       issue(issues, 'pricing_mode', '약가 입력 방식을 확인해 주세요.');
-      return { amount: null, source: '약가 입력 방식 오류', status: 'invalid', regulation: null, basis_date: null, steps: [], links: [], issues };
+      return { amount: null, source: '약가 입력 방식 오류', status: 'invalid', regulation: null, basis_date: null, steps: [], links: [], years: [], notes: [], summary: '', issues };
     }
+    // Optional trusted extensions remain a code-only integration point. JSON cannot inject executable rules.
+    if (ruleSet === undefined) return Pricing.assess(scenario, readNumber);
     if (!ruleSet || ruleSet.verified !== true || typeof ruleSet.calculate !== 'function' || !ruleSet.regulation || !ruleSet.basis_date) {
       issue(issues, 'pricing_mode', '자동 약가 산정 규칙이 아직 검증되지 않았습니다. 직접 입력 방식을 사용해 주세요.', 'warning');
       return { amount: null, source: '자동 산정 미확인', status: 'unverified', regulation: null, basis_date: null, steps: [], links: [], issues };
@@ -211,9 +227,7 @@
     const packaging = readNumber(scenario.batch_packaging, 'batch_packaging', '배치 전체 포자재비', issues, { required: true });
     const labor = readNumber(scenario.batch_labor, 'batch_labor', '배치 전체 공수비', issues, { required: true });
     const target = readNumber(scenario.target_rate, 'target_rate', '목표 제조원가율', issues);
-    const postPrice = readNumber(scenario.post_price, 'post_price', '가산 종료 후 예상 약가', issues);
-    readNumber(scenario.original_price, 'original_price', '오리지널 약가', issues);
-    if (postPrice && postPrice.isZero()) issue(issues, 'post_price', '가산 종료 후 약가가 0이어서 해당 원가율을 계산할 수 없습니다.', 'warning');
+    // post_price is retained only for lossless legacy-file round trips; both new modes ignore it.
     const denominator = batch && yieldPercent ? batch.times(yieldPercent).div(100) : null;
     const rows = [];
     let apiBatch = batch ? zero() : null;
@@ -254,7 +268,7 @@
     delete pricing.issues;
     const price = pricing.amount;
     const rate = total !== null && price !== null && price.gt(0) ? total.div(price).times(100) : null;
-    const postRate = total !== null && postPrice !== null && postPrice.gt(0) ? total.div(postPrice).times(100) : null;
+    const postRate = null;
     const allowed = price !== null && price.gt(0) && target !== null ? price.times(target).div(100) : null;
     const saving = total !== null && allowed !== null ? Decimal.max(0, total.minus(allowed)) : null;
     return {
@@ -286,6 +300,35 @@
     readNumber(value, path, path, issues, options);
     if (issues.length) fileError(issues[0].message);
   }
+  function migrateProject(project) {
+    if (project === null || typeof project !== 'object' || Array.isArray(project)) return project;
+    if (project.format !== FORMAT || project.schema_version !== 1) return project;
+    // Never drop unknown fields or excess scenarios while upgrading an older file.
+    if (!Array.isArray(project.scenarios)) return project;
+    if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
+    for (const scenario of project.scenarios) {
+      if (scenario && typeof scenario === 'object' && !Array.isArray(scenario) && Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) fileError('이전 버전 파일에 지원하지 않는 약가 조건 항목이 있습니다.');
+      normalizeScenario(scenario);
+    }
+    project.schema_version = VERSION;
+    return project;
+  }
+  function validatePricingConditions(conditions, path) {
+    object(conditions, path, Object.keys(Pricing.CONDITION_DEFAULTS));
+    Pricing.BOOLEAN_FIELDS.forEach(field => {
+      if (typeof conditions[field] !== 'boolean') fileError(path + ' ' + field + '은(는) 체크 여부여야 합니다.');
+    });
+    choice(conditions.general_category, path + ' 일반가산', ['none', 'data_submission', 'improved', 'biologic']);
+    choice(conditions.supply_category, path + ' 수급안정 가산', ['none', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
+    choice(conditions.general_subtype, path + ' 세부 산정유형', ['', 'salt_isomer', 'new_form', 'new_dose', 'combination', 'biosimilar']);
+    if (!Number.isInteger(conditions.selected_year) || conditions.selected_year < 1 || conditions.selected_year > 10) fileError(path + ' 적용 연차는 1~10의 정수여야 합니다.');
+    for (const field of ['listing_date', 'general_trigger_date']) {
+      string(conditions[field], path + ' ' + field);
+      if (conditions[field] !== '' && !Pricing.validDate(conditions[field])) fileError(path + ' ' + field + '에 올바른 날짜를 입력해 주세요.');
+    }
+    for (const field of ['general_base', 'general_cap']) fileNumber(conditions[field], path + ' ' + field);
+    string(conditions.migration_review, path + ' 이전 조건 확인 안내');
+  }
   function validateProject(project) {
     if (project === null || typeof project !== 'object' || Array.isArray(project)) fileError('JSON 프로젝트 객체가 필요합니다.');
     if (project.format !== FORMAT) fileError('지원하지 않는 파일 형식입니다. 기존 데스크톱 JSON은 자동 변환하지 않습니다.');
@@ -300,7 +343,7 @@
     const ids = new Set();
     project.scenarios.forEach((scenario, index) => {
       const path = '시나리오 ' + (index + 1);
-      normalizeScenario(scenario);
+      normalizeScenario(scenario, false);
       object(scenario, path, SCENARIO_KEYS);
       string(scenario.id, path + ' ID', true);
       if (ids.has(scenario.id)) fileError('시나리오 ID가 중복되어 있습니다.');
@@ -308,11 +351,12 @@
       string(scenario.name, path + ' 이름', true);
       string(scenario.packaging_form, path + ' 포장형태');
       choice(scenario.pricing_mode, path + ' 약가 방식', ['manual', 'official']);
-      choice(scenario.company_type, path + ' 기업 구분', ['', 'innovative', 'near', 'general']);
+      choice(scenario.company_type, path + ' 기업 구분', ['', 'innovative', 'near', 'supply_leader', 'general']);
       choice(scenario.identical_count_band, path + ' 동일제제 품목 수', ['', 'lt14', 'ge14']);
       if (!Array.isArray(scenario.pricing_flags)) fileError(path + ' 가산 조건의 형식이 올바르지 않습니다.');
       scenario.pricing_flags.forEach(flag => choice(flag, path + ' 가산 조건', FLAGS));
       if (new Set(scenario.pricing_flags).size !== scenario.pricing_flags.length) fileError(path + ' 가산 조건이 중복되어 있습니다.');
+      validatePricingConditions(scenario.pricing_conditions, path + ' 약가 조건');
       NUMBER_FIELDS.forEach(field => {
         const opts = field === 'batch_size' ? { positive: true, integer: true } : field === 'yield_percent' ? { positive: true, maximum: '100' } : field === 'exchange_rate' ? { positive: true } : {};
         fileNumber(scenario[field], path + ' ' + field, opts);
@@ -343,7 +387,7 @@
     let project;
     try { project = JSON.parse(text.replace(/^\uFEFF/, '')); }
     catch (_) { fileError('JSON 문법이 올바르지 않습니다. 파일이 손상되었는지 확인해 주세요.'); }
-    return validateProject(project);
+    return validateProject(migrateProject(project));
   }
 
   function serializeProject(project) {
@@ -358,5 +402,5 @@
     return result;
   }
 
-  return Object.freeze({ Decimal, FORMAT, VERSION, MAX_SCENARIOS, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
+  return Object.freeze({ Decimal, Pricing, makePricingConditions: Pricing.makePricingConditions, FORMAT, VERSION, MAX_SCENARIOS, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
 }));

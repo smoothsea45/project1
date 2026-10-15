@@ -171,12 +171,24 @@ def test_unusable_insurance_price_has_neutral_donut_and_valid_cost_stack(page, p
     assert_finite_chart(page)
 
 
-def test_loaded_automatic_mode_draws_only_real_manual_price_after_mode_normalization(page):
+def test_loaded_incomplete_automatic_mode_keeps_cost_stack_and_manual_price_for_return(page):
     payload = project(page)
     payload["scenarios"][0]["pricing_mode"] = "official"
     open_file(page, {"name": "existing-auto.json", "mimeType": "application/json", "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8")})
+    assert scenario(page)["pricing_mode"] == "official"
+    assert scenario(page)["manual_price"] == "300"
     results(page)
-    assert scenario(page)["pricing_mode"] == "manual"
+    expect(page.locator("#result-cost")).to_have_text("80.00")
+    expect(page.locator("#result-rate")).to_have_text("계산 불가")
+    expect(page.locator("#donut-rate")).to_have_text("계산 불가")
+    expect(page.locator("#composition-donut [data-item]")).to_have_count(0)
+    assert stack_share(page, "api") == pytest.approx(50)
+    assert_finite_chart(page)
+    input_tab(page)
+    page.locator('[data-field="pricing_mode"][value="manual"]').check()
+    expect(page.locator("#manual-price")).to_have_value("300")
+    results(page)
+    expect(page.locator("#result-price")).to_have_text("300.00")
     expect(page.locator("#donut-rate")).to_have_text("26.7%")
     assert donut_share(page, "api") == pytest.approx(40 / 300 * 100)
     assert stack_share(page, "api") == pytest.approx(50)

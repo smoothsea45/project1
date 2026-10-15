@@ -199,6 +199,119 @@
   .page-tabs .tab{min-width:0;min-height:48px;padding:12px 8px;font-size:13px;gap:6px}
 }
 
+/* 약가 입력 방식과 선택한 조건에 따른 연차별 예상 약가 */
+.pricing-mode-switch{display:inline-flex;align-items:center;gap:3px;padding:3px;border:1px solid #d7e4e7;border-radius:8px;background:#f0f5f6}
+.pricing-mode-switch .pricing-method{margin:0;border:1px solid transparent;border-radius:5px;background:transparent;color:var(--ink-soft);padding:5px 9px;font-size:11px;line-height:1.4}
+.pricing-mode-switch .pricing-method:has(input:checked){background:#fff;border-color:#b9d8d5;color:var(--teal-dark);box-shadow:0 1px 2px #153c4d0a}
+.pricing-card .pricing-layout{grid-template-columns:minmax(0,1fr) minmax(230px,.27fr);gap:18px;align-items:start}
+.pricing-card .pricing-selectors{display:grid;grid-template-columns:minmax(175px,.75fr) minmax(0,2.25fr);grid-template-rows:max-content 1fr;gap:10px;align-items:start}
+.pricing-card .pricing-information-group{min-width:0;padding:12px;background:#f8fbfc;border:1px solid var(--line);border-radius:8px}
+.pricing-card .pricing-information-group>h3{margin:0 0 10px;color:var(--ink-soft);font-size:12px;font-weight:700;letter-spacing:-.2px}
+.pricing-card .pricing-information-group.company-group{grid-column:1;grid-row:1;display:block}
+.pricing-card .pricing-information-group.drug-group{grid-column:2;grid-row:1 / 3}
+.pricing-card .pricing-information-group.market-group{grid-column:1;grid-row:2}
+.pricing-card .pricing-information-group legend{position:static;display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 7px;min-height:0;width:auto;margin:0 0 5px;font-size:10px;color:var(--ink-soft)}
+.pricing-card .pricing-information-group .choice{display:flex;align-items:flex-start;min-height:0;padding:5px 0;gap:7px;font-size:11px;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+.pricing-card .pricing-information-group .choice input{margin-top:1px}
+.pricing-card .pricing-information-group .choice:first-of-type{margin-top:0}
+.pricing-card .pricing-information-group .selection-note{font-size:9px;line-height:1.4}
+.pricing-card .pricing-information-group .help-text{font-size:9px;line-height:1.6;margin-top:4px}
+.pricing-card .pricing-base-criteria{padding-bottom:10px;margin-bottom:12px;border-bottom:1px solid #e2ebee}
+.pricing-card .drug-subgroups{grid-template-columns:1fr 1.1fr;gap:18px}
+.pricing-card .drug-subgroup+.drug-subgroup{border-left:1px solid #e2ebee;padding-left:14px}
+.pricing-card .pricing-listing-date{margin-top:12px}
+.pricing-card .pricing-listing-date label{font-size:10px}
+.pricing-card .pricing-amounts{grid-template-columns:minmax(0,1fr);gap:18px;padding-left:18px;border-top:0;border-left:1px solid var(--line)}
+.pricing-card .pricing-amounts .field label{min-height:0;font-size:11px}
+.pricing-card .pricing-amounts .field small{line-height:1.6}
+.pricing-condition-details{margin-top:11px;padding-top:9px;border-top:1px solid #dce7e9}
+.pricing-detail-fields,.pricing-detail-checks{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 12px}
+.pricing-detail-fields{margin-bottom:9px}
+.pricing-detail-fields label{font-size:10px;line-height:1.5}
+.pricing-detail-checks .choice{padding:3px 0}
+.pricing-card input:disabled,.pricing-card select:disabled{color:#7d8c96;background:#eef2f4;border-color:#dbe3e7;opacity:1;cursor:default;-webkit-text-fill-color:#7d8c96}
+.pricing-card input[type=checkbox]:disabled,.pricing-card input[type=radio]:disabled{opacity:.55}
+.pricing-card .choice:has(input:disabled){color:#88979e;cursor:default}
+.pricing-card .field:has(input:disabled)>label{color:#89979e}
+.pricing-calculated-price{padding-top:2px;font-variant-numeric:tabular-nums}
+.pricing-calculated-price>span{font-size:11px;font-weight:700;color:var(--ink-soft)}
+.pricing-calculated-price>div{display:flex;align-items:baseline;gap:7px;margin:6px 0}
+.pricing-calculated-price output{font-size:25px;line-height:1.35;letter-spacing:-.5px;font-weight:700;color:var(--teal-dark);overflow-wrap:anywhere}
+.pricing-calculated-price>p{font-size:11px;color:var(--ink-soft)}
+.pricing-migration-notice{display:flex;align-items:center;gap:12px;margin:0 18px 13px;padding:10px 12px;border:1px solid #edd9ad;border-radius:7px;background:var(--amber-light);font-size:11px;color:#886025}
+.pricing-migration-notice p{flex:1;min-width:0}
+.pricing-forecast{padding:17px 18px 18px;border-top:1px solid var(--line)}
+.pricing-forecast-heading{display:flex;align-items:baseline;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.pricing-forecast-heading h3{margin:0;font-size:13px;letter-spacing:-.2px}
+.pricing-forecast-heading>span{color:var(--muted);font-size:10px}
+.pricing-forecast-summary{margin-top:11px;font-size:15px;font-weight:700;line-height:1.6;color:var(--teal-dark);font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.pricing-forecast-context{margin-top:3px;font-size:11px;line-height:1.6;color:var(--ink-soft)}
+.pricing-forecast-chart{display:grid;grid-template-columns:68px minmax(0,1fr);gap:4px;margin-top:18px}
+.pricing-y-axis{height:260px;display:flex;flex-direction:column;justify-content:space-between;align-items:flex-end;padding-right:10px;color:var(--muted);font-size:10px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.pricing-year-scroll{min-width:0;overflow-x:auto;scrollbar-width:thin;padding:0 3px 3px}
+.pricing-year-bars{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:10px;min-width:640px;isolation:isolate}
+.pricing-year-button{display:grid;grid-template-rows:260px 40px;align-items:stretch;min-width:0;position:relative;padding:0 4px;border:0;border-radius:6px;background:transparent;color:var(--ink-soft);text-align:center;font-variant-numeric:tabular-nums}
+.pricing-year-button:hover{background:#118b8709}
+.pricing-year-button[aria-pressed=true],.pricing-year-button.selected{background:#eaf7f5;box-shadow:inset 0 0 0 1px #118b8770}
+.pricing-year-button:focus-visible{outline:2px solid var(--teal);outline-offset:1px}
+.pricing-year-amount{position:absolute;left:50%;transform:translateX(-50%);bottom:calc(var(--bar-height) + 6px);font-size:11px;line-height:1.2;font-weight:700;color:var(--ink);white-space:nowrap}
+.pricing-year-column{display:flex;align-items:flex-end;justify-content:center;position:relative;height:260px;border-bottom:1px solid #bdced4;background:linear-gradient(to top,transparent calc(25% - 1px),#e9eff1 calc(25% - 1px),#e9eff1 25%,transparent 25%,transparent calc(50% - 1px),#e9eff1 calc(50% - 1px),#e9eff1 50%,transparent 50%,transparent calc(75% - 1px),#e9eff1 calc(75% - 1px),#e9eff1 75%,transparent 75%)}
+.pricing-year-fill{display:block;width:min(48px,100%);min-height:0;background:#7f94b7;border-radius:5px 5px 0 0;transition:height .15s}
+.pricing-year-button.bonus .pricing-year-fill,.pricing-year-button[data-bonus=true] .pricing-year-fill,.pricing-year-fill.bonus{background:var(--teal)}
+.pricing-year-button.extension .pricing-year-fill,.pricing-year-button[data-extension=true] .pricing-year-fill{background:#66afa5}
+.pricing-year-label{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;padding-top:5px;font-size:10px;line-height:1.4;white-space:normal}
+.pricing-year-label strong{font-weight:600;color:var(--ink-soft)}
+.pricing-year-label small{font-size:9px;color:var(--muted)}
+.pricing-forecast-message{margin-top:12px;padding:11px 12px;border:1px solid #e6d9b9;border-radius:7px;background:#fffbef;font-size:11px;color:#886025;line-height:1.65}
+.pricing-forecast-assumption{margin-top:11px;font-size:10px;color:var(--muted);line-height:1.7}
+.pricing-calculation-details{font-size:10px;color:var(--ink-soft);line-height:1.8;margin-top:9px;overflow-wrap:anywhere}
+.pricing-calculation-details details{padding-top:8px;border-top:1px solid #e8eff1}
+.pricing-calculation-details summary{cursor:pointer;font-weight:600}
+.pricing-calculation-details ul,.pricing-calculation-details ol{margin:6px 0;padding-left:18px}
+.pricing-calculation-details a{text-decoration:underline;text-underline-offset:2px}
+@media(max-width:1180px){
+  .pricing-card .pricing-layout{grid-template-columns:minmax(0,1fr) minmax(210px,.3fr);gap:14px}
+  .pricing-card .pricing-selectors{grid-template-columns:minmax(160px,.85fr) minmax(0,2fr)}
+  .pricing-card .drug-subgroups{grid-template-columns:1fr;gap:12px}
+  .pricing-card .drug-subgroup+.drug-subgroup{border-left:0;padding-left:0;padding-top:10px;border-top:1px solid #e2ebee}
+}
+@media(max-width:900px){
+  .pricing-card .pricing-layout{grid-template-columns:minmax(0,1fr)}
+  .pricing-card .pricing-selectors{grid-template-columns:minmax(170px,.8fr) minmax(0,2fr)}
+  .pricing-card .pricing-amounts{grid-template-columns:repeat(2,minmax(0,1fr));border-left:0;border-top:1px solid var(--line);padding:13px 0 0;gap:12px}
+  .pricing-card .drug-subgroups{grid-template-columns:1fr 1fr}
+  .pricing-card .drug-subgroup+.drug-subgroup{border-top:0;padding-top:0;border-left:1px solid #e2ebee;padding-left:12px}
+}
+@media(max-width:720px){
+  .pricing-card .section-heading{align-items:center;gap:8px}
+  .pricing-card .section-heading>div:first-child{gap:8px}
+  .pricing-mode-switch .pricing-method{font-size:10px;padding:5px 7px;gap:5px}
+  .pricing-mode-switch input[type=radio]{width:13px;height:13px}
+  .pricing-card .pricing-selectors{grid-template-columns:minmax(0,1fr);grid-template-rows:none;gap:10px}
+  .pricing-card .pricing-information-group.company-group,.pricing-card .pricing-information-group.drug-group,.pricing-card .pricing-information-group.market-group{grid-column:auto;grid-row:auto}
+  .pricing-card .pricing-information-group.company-group>fieldset{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 10px}
+  .pricing-card .pricing-information-group.company-group>fieldset legend{grid-column:1 / -1;width:100%}
+  .pricing-card .pricing-information-group .choice{font-size:10px}
+  .pricing-card .pricing-information-group>h3{font-size:11px;margin-bottom:8px}
+  .pricing-card .pricing-information-group .count-group{display:block}
+  .pricing-card .drug-subgroups{gap:10px}
+  .pricing-card .drug-subgroups legend{font-size:10px;line-height:1.6}
+  .pricing-card .drug-subgroup+.drug-subgroup{padding-left:10px}
+  .pricing-card .pricing-amounts .field label{font-size:10px}
+  .pricing-detail-fields,.pricing-detail-checks{grid-template-columns:minmax(0,1fr)}
+  .pricing-migration-notice{margin:0 13px 12px;flex-wrap:wrap;font-size:10px}
+  .pricing-migration-notice p{flex-basis:100%}
+  .pricing-calculated-price output{font-size:21px}
+  .pricing-forecast{padding:14px 13px}
+  .pricing-forecast-heading h3{font-size:12px}
+  .pricing-forecast-heading>span{font-size:9px}
+  .pricing-forecast-summary{font-size:13px}
+  .pricing-forecast-context{font-size:10px}
+  .pricing-forecast-chart{grid-template-columns:49px minmax(0,1fr);gap:0}
+  .pricing-y-axis{padding-right:5px;font-size:9px}
+  .pricing-year-bars{gap:7px}
+}
+
 /* 비교표 출력: 최대 네 시나리오를 A4 가로 용지에 표시합니다. */
 @page{size:A4 landscape;margin:8mm}
 @media print{
