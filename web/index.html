@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=23">
+  <link rel="stylesheet" href="styles.css?v=24">
   <script defer src="vendor/decimal.js"></script>
   <script defer src="pricing.js?v=3"></script>
   <script defer src="engine.js?v=11"></script>
   <script defer src="forecast.js?v=2"></script>
-  <script defer src="profit-view.js?v=3"></script>
-  <script defer src="app.js?v=23"></script>
+  <script defer src="profit-view.js?v=4"></script>
+  <script defer src="app.js?v=24"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -185,7 +185,7 @@
       <div id="profit-scenario-legend" class="profit-scenario-legend" aria-label="시나리오별 그래프 색상"></div>
       <div class="profit-chart-grid">
         <section class="card profit-chart-card" aria-labelledby="profit-annual-heading"><div class="section-heading"><div><h2 id="profit-annual-heading">연차별 예상이익</h2><span class="section-note">같은 연도의 시나리오를 나란히 비교</span></div></div><div id="profit-annual-chart" class="profit-chart-scroll"></div></section>
-        <section class="card profit-chart-card" aria-labelledby="profit-cumulative-heading"><div class="section-heading"><div><h2 id="profit-cumulative-heading">기간 누적 예상이익 · 연차별 구성</h2><span class="section-note">시나리오별 연차 이익 누적 · 흑자/적자 분리</span></div></div><div id="profit-cumulative-chart" class="profit-chart-scroll"></div></section>
+        <section class="card profit-chart-card" aria-labelledby="profit-cumulative-heading"><div class="section-heading"><div><h2 id="profit-cumulative-heading">연차별 누적 예상이익</h2><span class="section-note">1년차부터 해당 연차까지 누적 · 시나리오별 나란히 비교</span></div></div><div id="profit-cumulative-chart" class="profit-chart-scroll"></div></section>
       </div>
       <section class="card profit-summary-card" aria-labelledby="profit-summary-heading"><div class="section-heading"><div><h2 id="profit-summary-heading">시나리오별 누적 비교</h2><span class="section-note">판매수량: T · 금액: 원</span></div></div><p id="profit-baseline-note" class="profit-baseline-note"></p><div class="table-scroll"><table class="profit-table profit-summary-table"><caption class="visually-hidden">시나리오별 누적 판매수량(T), 매출액(원), 제조원가(원), 예상이익(원) 및 기준 시나리오 대비 차이(원)</caption><thead id="profit-summary-head"></thead><tbody id="profit-summary-body"></tbody></table></div></section>
       <details class="card profit-details-card"><summary>연차별 계산 내역 <span>판매수량·매출액·제조원가·예상이익 확인</span></summary><div class="table-scroll"><table class="profit-table profit-details-table"><caption class="visually-hidden">시나리오별 연차별 계산 내역, 판매수량 T, 금액 원</caption><thead id="profit-details-head"></thead><tbody id="profit-details-body"></tbody></table></div></details>

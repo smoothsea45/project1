@@ -54,10 +54,6 @@ def mark(page, kind, scenario_id, year):
     )
 
 
-def cumulative_total(page, scenario_id):
-    return page.locator(f'#profit-cumulative-chart .profit-cumulative-total[data-scenario-id="{scenario_id}"]')
-
-
 def assert_clean_analysis(page):
     text = page.locator("#tab-profit").inner_text()
     assert not re.search(r"NaN|Infinity|undefined", text)
@@ -139,7 +135,7 @@ def test_profit_uses_unrounded_unit_cost_and_does_not_modify_existing_price_sele
     expect(summary.locator('[data-profit-field="total_cost"]')).to_have_text("5,012")
     expect(summary.locator('[data-profit-field="total_profit"]')).to_have_text("24,988")
     expect(mark(page, "annual", before["id"], 1)).to_have_attribute("data-value", "24987.6543211")
-    expect(mark(page, "cumulative", before["id"], 1)).to_have_attribute("data-segment-value", "24987.6543211")
+    expect(mark(page, "cumulative", before["id"], 1)).to_have_attribute("data-value", "24987.6543211")
     tooltip = mark(page, "annual", before["id"], 1).get_attribute("aria-label")
     assert "5,012 원" in tooltip
     assert "24,988 원" in tooltip
@@ -294,19 +290,13 @@ def test_blank_quantities_are_unknown_zero_quantities_are_valid_and_cumulative_n
     expect(mark(page, "cumulative", current_id, 1)).to_have_count(1)
     expect(mark(page, "cumulative", current_id, 2)).to_have_count(0)
     expect(mark(page, "cumulative", current_id, 3)).to_have_count(0)
-    partial = cumulative_total(page, current_id)
-    expect(partial).to_have_attribute("data-complete", "false")
-    expect(partial).to_have_attribute("data-net-total", "0")
-    expect(partial).to_contain_text("부분합")
-    expect(partial).to_contain_text(re.compile(r"1(?:~1)?년차"))
-    expect(partial.locator('[data-profit-field="partial_profit"]')).to_have_text(re.compile(r"^0(?:\s*원)?$"))
-    expect(partial.locator('[data-profit-field="total_profit"]')).to_have_count(0)
-    assert "순누적합계" not in partial.inner_text()
+    summary = page.locator(f'#profit-summary-body tr[data-scenario-id="{current_id}"]')
+    expect(summary.locator('[data-profit-field="total_profit"]')).to_have_text("—")
+    expect(summary).to_contain_text("미완성")
     page.locator("#tab-button-input").click()
     quantities(page, 1).fill("1000")
     analysis(page)
-    expect(cumulative_total(page, current_id)).to_have_attribute("data-net-total", "270000")
-    expect(mark(page, "cumulative", current_id, 1)).to_have_attribute("data-segment-value", "270000")
+    expect(mark(page, "cumulative", current_id, 1)).to_have_attribute("data-value", "270000")
     expect(mark(page, "cumulative", current_id, 3)).to_have_count(0)
     assert_clean_analysis(page)
 
@@ -376,7 +366,7 @@ def test_losses_appear_below_zero_and_scenarios_share_a_real_scale(page):
 
 
 @pytest.mark.parametrize("price,profits", [("100", [70000, 140000, 210000]), ("10", [-20000, -40000, -60000])])
-def test_cumulative_chart_stacks_annual_contributions_as_one_bar_per_scenario(page, price, profits):
+def test_cumulative_chart_groups_scenarios_by_year_using_signed_running_totals_and_common_scale(page, price, profits):
     setup_base(page)
     page.locator("#manual-price").fill(price)
     first_id = scenario(page)["id"]
@@ -387,37 +377,46 @@ def test_cumulative_chart_stacks_annual_contributions_as_one_bar_per_scenario(pa
     analysis(page)
     cumulative = page.locator("#profit-cumulative-chart svg")
     expect(cumulative.locator("circle, polyline")).to_have_count(0)
-    scenario_x = []
+    expect(page.locator("#profit-cumulative-chart .profit-cumulative-total")).to_have_count(0)
+    baseline = float(cumulative.locator("[data-zero-y]").get_attribute("data-zero-y"))
+    geometries = {}
     for scenario_id in [first_id, second_id]:
         prefix = Decimal(0)
-        previous = None
+        previous_x = None
+        annual_color = mark(page, "annual", scenario_id, 1).get_attribute("fill")
         for year, contribution in enumerate(profits, start=1):
             bar = mark(page, "cumulative", scenario_id, year)
             assert bar.evaluate("node => node.tagName.toLowerCase()") == "rect"
-            expect(bar).to_have_attribute("data-segment-value", str(contribution))
-            expect(bar).to_have_attribute("data-stack-start", str(prefix))
             prefix += contribution
-            expect(bar).to_have_attribute("data-stack-end", str(prefix))
             expect(bar).to_have_attribute("data-value", str(prefix))
+            expect(bar).to_have_attribute("fill", annual_color)
+            assert bar.get_attribute("data-stack-start") is None
+            assert bar.get_attribute("data-segment-value") is None
             geometry = bar.evaluate("node => Object.fromEntries(['x','y','width','height'].map(key => [key,+node.getAttribute(key)]))")
             assert geometry["height"] > 0
-            if previous:
-                assert geometry["x"] == previous["x"]
-                assert geometry["width"] == previous["width"]
-                if contribution > 0:
-                    assert abs(geometry["y"] + geometry["height"] - previous["y"]) < 0.1
-                else:
-                    assert abs(geometry["y"] - previous["y"] - previous["height"]) < 0.1
-            previous = geometry
-        scenario_x.append(previous["x"])
-        total = cumulative_total(page, scenario_id)
-        expect(total).to_contain_text("순누적")
-        expect(total).to_contain_text(f"{sum(profits):,}")
-    assert scenario_x[0] != scenario_x[1], "Alternative scenarios must occupy separate bars"
+            if prefix > 0:
+                assert abs(geometry["y"] + geometry["height"] - baseline) < 0.1
+            else:
+                assert abs(geometry["y"] - baseline) < 0.1
+            if previous_x is not None:
+                assert geometry["x"] > previous_x
+            previous_x = geometry["x"]
+            geometries[(scenario_id, year)] = geometry
+    for year in range(1, 4):
+        first = geometries[(first_id, year)]
+        second = geometries[(second_id, year)]
+        assert first["x"] + first["width"] < second["x"]
+        assert abs(first["height"] - second["height"]) < 0.1, "Equal cumulative amounts need equal heights"
+        assert abs(first["y"] - second["y"]) < 0.1
+        if year < 3:
+            assert second["x"] + second["width"] < geometries[(first_id, year + 1)]["x"]
+    first_height = geometries[(first_id, 1)]["height"]
+    assert abs(geometries[(first_id, 2)]["height"] / first_height - 3) < 0.01
+    assert abs(geometries[(first_id, 3)]["height"] / first_height - 6) < 0.01
     assert_clean_analysis(page)
 
 
-def test_mixed_profit_and_loss_stack_separately_while_footer_reports_signed_net_total(page):
+def test_cumulative_bars_show_running_net_when_an_annual_loss_reduces_or_crosses_zero(page):
     setup_automatic(page, company="innovative", count="ge14")
     condition(page, "company_eligible").check()
     condition(page, "domestic_extension").check()
@@ -428,21 +427,25 @@ def test_mixed_profit_and_loss_stack_separately_while_footer_reports_signed_net_
     current_id = scenario(page)["id"]
     assert [row["profit"] for row in profit_scenario(page)["rows"]] == ["8000", "16000", "0", "8000", "-13700"]
     analysis(page)
-    positive_end = mark(page, "cumulative", current_id, 4)
-    loss = mark(page, "cumulative", current_id, 5)
-    expect(positive_end).to_have_attribute("data-stack-start", "24000")
-    expect(positive_end).to_have_attribute("data-stack-end", "32000")
-    expect(loss).to_have_attribute("data-stack-start", "0")
-    expect(loss).to_have_attribute("data-stack-end", "-13700")
-    expect(loss).to_have_attribute("data-segment-value", "-13700")
-    expect(loss).to_have_attribute("data-value", "18300")
+    values = ["8000", "24000", "24000", "32000", "18300"]
+    for year, value in enumerate(values, start=1):
+        expect(mark(page, "cumulative", current_id, year)).to_have_attribute("data-value", value)
     zero = float(page.locator('#profit-cumulative-chart [data-zero-y]').get_attribute("data-zero-y"))
-    assert float(positive_end.get_attribute("y")) < zero
-    assert float(loss.get_attribute("y")) >= zero - 0.1
-    total = cumulative_total(page, current_id)
-    expect(total).to_contain_text("순누적")
-    expect(total).to_contain_text("18,300")
-    assert "45,700" not in total.inner_text(), "The total must be signed net, not absolute stack heights"
+    fourth = mark(page, "cumulative", current_id, 4)
+    fifth = mark(page, "cumulative", current_id, 5)
+    assert float(fifth.get_attribute("y")) < zero, "The net remains positive despite an annual loss"
+    assert float(fifth.get_attribute("height")) < float(fourth.get_attribute("height"))
+    assert float(mark(page, "cumulative", current_id, 2).get_attribute("height")) == float(
+        mark(page, "cumulative", current_id, 3).get_attribute("height")
+    )
+    expect(mark(page, "annual", current_id, 5)).to_have_attribute("data-value", "-13700")
+    page.locator("#tab-button-input").click()
+    quantities(page, 5).fill("1000")
+    analysis(page)
+    expect(mark(page, "annual", current_id, 5)).to_have_attribute("data-value", "-137000")
+    expect(mark(page, "cumulative", current_id, 5)).to_have_attribute("data-value", "-105000")
+    zero = float(page.locator('#profit-cumulative-chart [data-zero-y]').get_attribute("data-zero-y"))
+    assert abs(float(mark(page, "cumulative", current_id, 5).get_attribute("y")) - zero) < 0.1
     assert_clean_analysis(page)
 
 
@@ -457,11 +460,11 @@ def test_small_negative_cash_rounds_for_display_without_negative_zero_or_changin
     assert profit_scenario(page)["rows"][0]["profit"] == "-0.4"
     analysis(page)
     expect(mark(page, "annual", current_id, 1)).to_have_attribute("data-value", "-0.4")
-    expect(mark(page, "cumulative", current_id, 1)).to_have_attribute("data-segment-value", "-0.4")
+    expect(mark(page, "cumulative", current_id, 1)).to_have_attribute("data-value", "-0.4")
     summary = page.locator(f'#profit-summary-body tr[data-scenario-id="{current_id}"]')
     expect(summary.locator('[data-profit-field="total_profit"]')).to_have_text("0")
     assert "-0 원" not in mark(page, "annual", current_id, 1).get_attribute("aria-label")
-    expect(cumulative_total(page, current_id)).not_to_contain_text("-0")
+    assert "-0 원" not in mark(page, "cumulative", current_id, 1).get_attribute("aria-label")
     assert_clean_analysis(page)
 
 

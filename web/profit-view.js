@@ -46,7 +46,7 @@
     return (issues || []).map(issue => typeof issue === 'string' ? issue : issue.message || issue.label || '').filter(Boolean).join(' · ');
   }
   function tooltip(scenario, row, cumulative) {
-    return scenario.name + ' · ' + row.year + '년차\nSF 판매수량 ' + money(row.quantity, 0) + ' T\n매출액 ' + money(row.sales) + ' 원\n약가 ' + money(row.price, 0) + ' 원/T · 제조원가율 ' + rate(row.cost_rate) + '\n예상 제조원가 ' + money(row.manufacturing_cost) + ' 원\n예상이익 ' + money(row.profit) + ' 원' + (cumulative ? '\n누적 예상이익 ' + money(row.cumulative_profit) + ' 원' : '');
+    return scenario.name + ' · ' + row.year + '년차' + (cumulative ? '\n누적 예상이익 ' + money(row.cumulative_profit) + ' 원' : '') + '\nSF 판매수량 ' + money(row.quantity, 0) + ' T\n매출액 ' + money(row.sales) + ' 원\n약가 ' + money(row.price, 0) + ' 원/T · 제조원가율 ' + rate(row.cost_rate) + '\n예상 제조원가 ' + money(row.manufacturing_cost) + ' 원\n해당 연차 예상이익 ' + money(row.profit) + ' 원';
   }
   function axisLabel(value) {
     const amount = new D(value);
@@ -112,84 +112,35 @@
   function emptyChart(host) {
     host.append(el('div', 'profit-chart-empty', '연차별 SF와 원가 계산에 필요한 값을 입력하면 그래프가 표시됩니다.'));
   }
-  function renderAnnualChart(result) {
-    const host = $('profit-annual-chart');
+  function renderChart(result, cumulative) {
+    const host = $(cumulative ? 'profit-cumulative-chart' : 'profit-annual-chart');
     host.replaceChildren();
-    const values = result.scenarios.flatMap(scenario => scenario.rows.filter(row => row.profit !== null && row.profit !== undefined).map(row => new D(row.profit)));
+    const key = cumulative ? 'cumulative_profit' : 'profit';
+    const values = result.scenarios.flatMap(scenario => scenario.rows.filter(row => row[key] !== null && row[key] !== undefined).map(row => new D(row[key])));
     if (!values.length) { emptyChart(host); return; }
     const labels = Array.from({length: result.years}, (_, index) => index + 1 + '년차');
-    const {graphic, x, y, zero, chartWidth} = chartFrame(values, labels, '연차별 예상이익 비교', '가로축은 연차, 세로축 금액은 원입니다. 적자는 0 아래에 표시하고 미완성 연도는 표시하지 않습니다.');
+    const title = cumulative ? '연차별 누적 예상이익 비교' : '연차별 예상이익 비교';
+    const description = cumulative
+      ? '가로축은 연차, 세로축은 1년차부터 해당 연차까지의 누적 예상이익(원)입니다. 각 연차에서 시나리오별 막대를 나란히 비교합니다. 누적 적자는 0 아래에 표시하며 첫 미완성 연도부터는 누적 막대를 표시하지 않습니다.'
+      : '가로축은 연차, 세로축 금액은 원입니다. 적자는 0 아래에 표시하고 미완성 연도는 표시하지 않습니다.';
+    const {graphic, x, y, zero, chartWidth} = chartFrame(values, labels, title, description);
     result.scenarios.forEach((scenario, scenarioIndex) => {
       const tint = color(scenario.id);
       scenario.rows.forEach(row => {
-        const value = row.profit;
+        const value = row[key];
         if (value === null || value === undefined) return;
         const groupWidth = chartWidth / result.years * .74;
         const slotWidth = groupWidth / result.scenarios.length;
         const barWidth = Math.min(30, slotWidth * .82);
         const px = x(row.year) - groupWidth / 2 + slotWidth * (scenarioIndex + .5) - barWidth / 2;
         const point = y(value), isZero = new D(value).eq(0);
-        const mark = svg('rect', {x: px, y: isZero ? zero - 1.5 : Math.min(zero, point), width: barWidth, height: isZero ? 3 : Math.max(.6, Math.abs(zero - point)), rx: 2, fill: tint, class: isZero ? 'profit-zero-marker' : 'profit-annual-bar'});
-        describeMark(mark, scenario, row, false);
+        const barClass = cumulative ? 'profit-cumulative-bar' : 'profit-annual-bar';
+        const mark = svg('rect', {x: px, y: isZero ? zero - 1.5 : Math.min(zero, point), width: barWidth, height: isZero ? 3 : Math.max(.6, Math.abs(zero - point)), rx: 2, fill: tint, class: isZero ? 'profit-zero-marker' : barClass});
+        describeMark(mark, scenario, row, cumulative);
         graphic.append(mark);
       });
     });
     host.append(graphic);
-  }
-  function renderCumulativeChart(result) {
-    const host = $('profit-cumulative-chart');
-    host.replaceChildren();
-    const profiles = result.scenarios.map(scenario => {
-      const rows = [];
-      let positive = new D(0), negative = new D(0);
-      for (const row of scenario.rows) {
-        if (row.cumulative_profit === null || row.cumulative_profit === undefined) break;
-        rows.push(row);
-        if (new D(row.profit).gte(0)) positive = positive.plus(row.profit);
-        else negative = negative.plus(row.profit);
-      }
-      return {scenario, rows, positive, negative};
-    });
-    if (!profiles.some(profile => profile.rows.length)) { emptyChart(host); return; }
-    const values = profiles.flatMap(profile => [profile.positive, profile.negative]);
-    const labels = profiles.map((profile, index) => String(index + 1).padStart(2, '0') + '. ' + profile.scenario.name);
-    const {graphic, x, y, width, left, right, chartWidth} = chartFrame(values, labels, '기간 누적 예상이익 · 연차별 구성', '시나리오마다 막대 하나에 연차별 이익을 쌓습니다. 흑자는 0 위에, 적자는 0 아래에 쌓으며 순누적 합계는 막대 아래에 따로 표시합니다. 미완성은 첫 미입력 연도 전까지의 부분합만 표시합니다.');
-    const totals = el('div', 'profit-stack-totals');
-    profiles.forEach((profile, index) => {
-      const {scenario, rows} = profile;
-      const tint = color(scenario.id);
-      let positive = new D(0), negative = new D(0);
-      const barWidth = Math.min(110, chartWidth / profiles.length * .55);
-      const px = x(index + 1) - barWidth / 2;
-      rows.forEach(row => {
-        const value = new D(row.profit), isPositive = value.gte(0), isZero = value.eq(0);
-        const start = isPositive ? positive : negative, end = start.plus(value);
-        if (isPositive) positive = end; else negative = end;
-        const top = Math.min(y(start), y(end)), height = Math.abs(y(end) - y(start));
-        const opacity = .4 + .6 * row.year / result.years;
-        const mark = svg('rect', {x: px, y: isZero ? y(start) - 1.5 : top, width: barWidth, height: isZero ? 3 : height, fill: tint, 'fill-opacity': opacity, stroke: '#fff', 'stroke-width': .8, 'vector-effect': 'non-scaling-stroke', class: 'profit-cumulative-segment'});
-        describeMark(mark, scenario, row, true);
-        mark.dataset.segmentValue = value.toString();
-        mark.dataset.stackStart = start.toString(); mark.dataset.stackEnd = end.toString();
-        graphic.append(mark);
-        if (!isZero && height >= 18) graphic.append(svg('text', {x: x(index + 1), y: top + height / 2 + 4, 'text-anchor': 'middle', class: 'profit-stack-year', fill: opacity >= .72 ? '#fff' : '#173e4c', 'pointer-events': 'none'}, row.year + '년차'));
-      });
-      const net = rows.length ? rows[rows.length - 1].cumulative_profit : null;
-      const total = el('div', 'profit-cumulative-total');
-      total.dataset.scenarioId = scenario.id; total.dataset.complete = String(scenario.complete);
-      total.dataset.netTotal = net === null ? '' : new D(net).toString();
-      total.append(el('span', 'profit-stack-total-label', scenario.complete ? '순누적 합계' : rows.length ? '부분합 · 1~' + rows.length + '년차' : '누적 계산 불가'));
-      const amount = el('strong', 'profit-stack-total-value', money(net) + (net === null ? '' : ' 원'));
-      amount.dataset.profitField = scenario.complete ? 'total_profit' : 'partial_profit';
-      if (net !== null && new D(net).lt(0)) amount.classList.add('negative');
-      total.append(amount, el('span', 'profit-stack-period', scenario.complete ? '1~' + result.years + '년차 합계' : result.years + '년 분석 · 입력 미완성'));
-      totals.append(total);
-    });
-    const plot = el('div', 'profit-cumulative-plot');
-    plot.style.setProperty('--profit-stack-columns', profiles.length);
-    plot.style.setProperty('--profit-plot-left', left / width * 100 + '%');
-    plot.style.setProperty('--profit-plot-right', right / width * 100 + '%');
-    plot.append(graphic, totals); host.append(plot);
   }
   function renderSummary(result) {
     const head = $('profit-summary-head'), body = $('profit-summary-body');
@@ -258,8 +209,8 @@
     const status = $('profit-analysis-status');
     status.classList.toggle('warning', !complete && anySales);
     status.textContent = !anySales ? '입력 탭에서 연차별 SF 판매수량(T)을 입력해 주세요. 판매가 없는 연도에는 0을 입력하세요.' : complete ? '모든 시나리오의 입력이 완료되었습니다. 현재 제조원가/T를 분석기간 동안 동일하게 적용합니다.' : '미입력 또는 계산 불가인 연도가 있습니다. 계산 가능한 연도만 그래프에 표시하며, 이후 누적값은 입력을 완료해야 계산됩니다.';
-    renderAnnualChart(result);
-    renderCumulativeChart(result);
+    renderChart(result, false);
+    renderChart(result, true);
     renderSummary(result);
     renderDetails(result);
   }
