@@ -25,9 +25,10 @@
     }
     return assignedColors.get(id);
   }
-  function money(value, places = 2) {
+  function money(value, places = 0) {
     if (value === null || value === undefined) return '—';
-    return new D(value).toFixed(places).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    const rounded = new D(value).toDecimalPlaces(places);
+    return (rounded.isZero() ? new D(0) : rounded).toFixed(places).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
   }
   function rate(value) { return value === null || value === undefined ? '계산 불가' : money(value, 1) + '%'; }
   function dot(id) {
@@ -49,25 +50,18 @@
   }
   function axisLabel(value) {
     const amount = new D(value);
-    if (amount.abs().gte('1000000000000000000000') || (!amount.eq(0) && amount.abs().lt('0.01'))) return amount.toExponential(1).replace('e+', 'e');
-    return money(amount, amount.eq(0) || amount.abs().gte(1) ? 0 : 2);
-  }
-  function renderChart(result, cumulative) {
-    const host = $(cumulative ? 'profit-cumulative-chart' : 'profit-annual-chart');
-    host.replaceChildren();
-    const values = [];
-    const key = cumulative ? 'cumulative_profit' : 'profit';
-    result.scenarios.forEach(scenario => scenario.rows.forEach(row => {
-      if (row[key] !== null && row[key] !== undefined) values.push(new D(row[key]));
-    }));
-    if (!values.length) {
-      host.append(el('div', 'profit-chart-empty', '연차별 SF와 원가 계산에 필요한 값을 입력하면 그래프가 표시됩니다.'));
-      return;
+    if (amount.abs().gte('1000000000000000000000')) {
+      const [coefficient, exponent] = amount.toExponential().split('e');
+      const [whole, fraction = ''] = coefficient.split('.');
+      return whole + fraction + 'e' + (Number(exponent) - fraction.length);
     }
+    return money(amount);
+  }
+  function chartFrame(values, labels, title, description) {
     let low = D.min(0, ...values), high = D.max(0, ...values);
     if (high.eq(low)) high = low.plus(1);
-    // Round only the display axis to useful intervals; domain values stay exact.
-    const targetStep = high.minus(low).div(4);
+    // Whole-won ticks only; source values and segment proportions stay exact.
+    const targetStep = D.max(1, high.minus(low).div(4));
     const magnitude = new D(10).pow(targetStep.e);
     const normalizedStep = targetStep.div(magnitude);
     const factor = [1, 2, 2.5, 5, 10].find(value => normalizedStep.lte(value));
@@ -82,11 +76,11 @@
     const width = 720, height = 350, left = Math.max(92, Math.min(198, labelWidth + 18)), right = 20, top = 32, bottom = 45;
     const chartWidth = width - left - right, chartHeight = height - top - bottom;
     const y = value => top + new D(high).minus(value).div(range).times(chartHeight).toNumber();
-    const x = year => left + chartWidth * (year - 0.5) / result.years;
+    const x = slot => left + chartWidth * (slot - 0.5) / labels.length;
     const zero = y(0);
-    const graphic = svg('svg', {viewBox: '0 0 ' + width + ' ' + height, role: 'img', 'aria-label': (cumulative ? '누적' : '연차별') + ' 예상이익, 금액 단위 원', class: 'profit-chart-svg'});
-    graphic.append(svg('title', {}, (cumulative ? '누적' : '연차별') + ' 예상이익 비교'));
-    graphic.append(svg('desc', {}, '가로축은 1년차부터 ' + result.years + '년차, 세로축 금액은 원입니다. 음수는 기준선 아래에 표시하며 미입력값은 표시하지 않습니다. 자세한 값은 아래 계산 내역 표에서 확인할 수 있습니다.'));
+    const graphic = svg('svg', {viewBox: '0 0 ' + width + ' ' + height, role: 'img', 'aria-label': title + ', 금액 단위 원', class: 'profit-chart-svg'});
+    graphic.append(svg('title', {}, title));
+    graphic.append(svg('desc', {}, description));
     graphic.append(svg('text', {x: left, y: 17, class: 'profit-axis-unit'}, '원'));
     for (let tick = 0; tick <= tickCount; tick++) {
       const value = high.minus(step.times(tick)), py = y(value);
@@ -94,50 +88,108 @@
       graphic.append(svg('text', {x: left - 10, y: py + 4, 'text-anchor': 'end', class: 'profit-axis-label'}, axisLabel(value)));
     }
     graphic.append(svg('line', {x1: left, x2: width - right, y1: zero, y2: zero, class: 'profit-zero-line', 'data-zero-y': zero}));
-    for (let year = 1; year <= result.years; year++) {
-      graphic.append(svg('text', {x: x(year), y: height - 17, 'text-anchor': 'middle', class: 'profit-axis-label'}, year + '년차'));
-    }
+    labels.forEach((label, index) => {
+      const available = Math.max(5, Math.floor(chartWidth / labels.length / 11));
+      const letters = Array.from(label);
+      const text = letters.length > available ? letters.slice(0, available - 1).join('') + '…' : label;
+      const node = svg('text', {x: x(index + 1), y: height - 17, 'text-anchor': 'middle', class: 'profit-axis-label'}, text);
+      node.append(svg('title', {}, label));
+      graphic.append(node);
+    });
+    return {graphic, x, y, zero, width, left, right, chartWidth};
+  }
+  function describeMark(mark, scenario, row, cumulative) {
+    const label = tooltip(scenario, row, cumulative);
+    mark.setAttribute('tabindex', '0');
+    mark.setAttribute('role', 'img');
+    mark.setAttribute('aria-label', label.replace(/\n/g, ' · '));
+    mark.dataset.scenarioId = scenario.id;
+    mark.dataset.year = row.year;
+    mark.dataset.value = new D(cumulative ? row.cumulative_profit : row.profit).toString();
+    mark.dataset.kind = cumulative ? 'cumulative' : 'annual';
+    mark.append(svg('title', {}, label));
+  }
+  function emptyChart(host) {
+    host.append(el('div', 'profit-chart-empty', '연차별 SF와 원가 계산에 필요한 값을 입력하면 그래프가 표시됩니다.'));
+  }
+  function renderAnnualChart(result) {
+    const host = $('profit-annual-chart');
+    host.replaceChildren();
+    const values = result.scenarios.flatMap(scenario => scenario.rows.filter(row => row.profit !== null && row.profit !== undefined).map(row => new D(row.profit)));
+    if (!values.length) { emptyChart(host); return; }
+    const labels = Array.from({length: result.years}, (_, index) => index + 1 + '년차');
+    const {graphic, x, y, zero, chartWidth} = chartFrame(values, labels, '연차별 예상이익 비교', '가로축은 연차, 세로축 금액은 원입니다. 적자는 0 아래에 표시하고 미완성 연도는 표시하지 않습니다.');
     result.scenarios.forEach((scenario, scenarioIndex) => {
       const tint = color(scenario.id);
-      if (cumulative) {
-        let segment = [];
-        const appendSegment = () => {
-          if (segment.length > 1) graphic.append(svg('polyline', {points: segment.join(' '), fill: 'none', stroke: tint, 'stroke-width': 2.5, 'stroke-linejoin': 'round', class: 'profit-cumulative-line', 'data-scenario-id': scenario.id}));
-          segment = [];
-        };
-        scenario.rows.forEach(row => {
-          if (row.cumulative_profit === null || row.cumulative_profit === undefined) { appendSegment(); return; }
-          segment.push(x(row.year) + ',' + y(row.cumulative_profit));
-        });
-        appendSegment();
-      }
       scenario.rows.forEach(row => {
-        const value = row[key];
+        const value = row.profit;
         if (value === null || value === undefined) return;
-        let mark;
-        if (cumulative) {
-          mark = svg('circle', {cx: x(row.year), cy: y(value), r: 4, fill: tint, stroke: '#fff', 'stroke-width': 1.4});
-        } else {
-          const groupWidth = chartWidth / result.years * .74;
-          const slotWidth = groupWidth / result.scenarios.length;
-          const barWidth = Math.min(30, slotWidth * .82);
-          const px = x(row.year) - groupWidth / 2 + slotWidth * (scenarioIndex + .5) - barWidth / 2;
-          const point = y(value), isZero = new D(value).eq(0);
-          mark = svg('rect', {x: px, y: isZero ? zero - 1.5 : Math.min(zero, point), width: barWidth, height: isZero ? 3 : Math.max(.6, Math.abs(zero - point)), rx: 2, fill: tint, class: isZero ? 'profit-zero-marker' : 'profit-annual-bar'});
-        }
-        const label = tooltip(scenario, row, cumulative);
-        mark.setAttribute('tabindex', '0');
-        mark.setAttribute('role', 'img');
-        mark.setAttribute('aria-label', label.replace(/\n/g, ' · '));
-        mark.dataset.scenarioId = scenario.id;
-        mark.dataset.year = row.year;
-        mark.dataset.value = new D(value).toString();
-        mark.dataset.kind = cumulative ? 'cumulative' : 'annual';
-        mark.append(svg('title', {}, label));
+        const groupWidth = chartWidth / result.years * .74;
+        const slotWidth = groupWidth / result.scenarios.length;
+        const barWidth = Math.min(30, slotWidth * .82);
+        const px = x(row.year) - groupWidth / 2 + slotWidth * (scenarioIndex + .5) - barWidth / 2;
+        const point = y(value), isZero = new D(value).eq(0);
+        const mark = svg('rect', {x: px, y: isZero ? zero - 1.5 : Math.min(zero, point), width: barWidth, height: isZero ? 3 : Math.max(.6, Math.abs(zero - point)), rx: 2, fill: tint, class: isZero ? 'profit-zero-marker' : 'profit-annual-bar'});
+        describeMark(mark, scenario, row, false);
         graphic.append(mark);
       });
     });
     host.append(graphic);
+  }
+  function renderCumulativeChart(result) {
+    const host = $('profit-cumulative-chart');
+    host.replaceChildren();
+    const profiles = result.scenarios.map(scenario => {
+      const rows = [];
+      let positive = new D(0), negative = new D(0);
+      for (const row of scenario.rows) {
+        if (row.cumulative_profit === null || row.cumulative_profit === undefined) break;
+        rows.push(row);
+        if (new D(row.profit).gte(0)) positive = positive.plus(row.profit);
+        else negative = negative.plus(row.profit);
+      }
+      return {scenario, rows, positive, negative};
+    });
+    if (!profiles.some(profile => profile.rows.length)) { emptyChart(host); return; }
+    const values = profiles.flatMap(profile => [profile.positive, profile.negative]);
+    const labels = profiles.map((profile, index) => String(index + 1).padStart(2, '0') + '. ' + profile.scenario.name);
+    const {graphic, x, y, width, left, right, chartWidth} = chartFrame(values, labels, '기간 누적 예상이익 · 연차별 구성', '시나리오마다 막대 하나에 연차별 이익을 쌓습니다. 흑자는 0 위에, 적자는 0 아래에 쌓으며 순누적 합계는 막대 아래에 따로 표시합니다. 미완성은 첫 미입력 연도 전까지의 부분합만 표시합니다.');
+    const totals = el('div', 'profit-stack-totals');
+    profiles.forEach((profile, index) => {
+      const {scenario, rows} = profile;
+      const tint = color(scenario.id);
+      let positive = new D(0), negative = new D(0);
+      const barWidth = Math.min(110, chartWidth / profiles.length * .55);
+      const px = x(index + 1) - barWidth / 2;
+      rows.forEach(row => {
+        const value = new D(row.profit), isPositive = value.gte(0), isZero = value.eq(0);
+        const start = isPositive ? positive : negative, end = start.plus(value);
+        if (isPositive) positive = end; else negative = end;
+        const top = Math.min(y(start), y(end)), height = Math.abs(y(end) - y(start));
+        const opacity = .4 + .6 * row.year / result.years;
+        const mark = svg('rect', {x: px, y: isZero ? y(start) - 1.5 : top, width: barWidth, height: isZero ? 3 : height, fill: tint, 'fill-opacity': opacity, stroke: '#fff', 'stroke-width': .8, 'vector-effect': 'non-scaling-stroke', class: 'profit-cumulative-segment'});
+        describeMark(mark, scenario, row, true);
+        mark.dataset.segmentValue = value.toString();
+        mark.dataset.stackStart = start.toString(); mark.dataset.stackEnd = end.toString();
+        graphic.append(mark);
+        if (!isZero && height >= 18) graphic.append(svg('text', {x: x(index + 1), y: top + height / 2 + 4, 'text-anchor': 'middle', class: 'profit-stack-year', fill: opacity >= .72 ? '#fff' : '#173e4c', 'pointer-events': 'none'}, row.year + '년차'));
+      });
+      const net = rows.length ? rows[rows.length - 1].cumulative_profit : null;
+      const total = el('div', 'profit-cumulative-total');
+      total.dataset.scenarioId = scenario.id; total.dataset.complete = String(scenario.complete);
+      total.dataset.netTotal = net === null ? '' : new D(net).toString();
+      total.append(el('span', 'profit-stack-total-label', scenario.complete ? '순누적 합계' : rows.length ? '부분합 · 1~' + rows.length + '년차' : '누적 계산 불가'));
+      const amount = el('strong', 'profit-stack-total-value', money(net) + (net === null ? '' : ' 원'));
+      amount.dataset.profitField = scenario.complete ? 'total_profit' : 'partial_profit';
+      if (net !== null && new D(net).lt(0)) amount.classList.add('negative');
+      total.append(amount, el('span', 'profit-stack-period', scenario.complete ? '1~' + result.years + '년차 합계' : result.years + '년 분석 · 입력 미완성'));
+      totals.append(total);
+    });
+    const plot = el('div', 'profit-cumulative-plot');
+    plot.style.setProperty('--profit-stack-columns', profiles.length);
+    plot.style.setProperty('--profit-plot-left', left / width * 100 + '%');
+    plot.style.setProperty('--profit-plot-right', right / width * 100 + '%');
+    plot.append(graphic, totals); host.append(plot);
   }
   function renderSummary(result) {
     const head = $('profit-summary-head'), body = $('profit-summary-body');
@@ -152,7 +204,7 @@
       const row = el('tr'); row.dataset.scenarioId = scenario.id;
       const name = el('th'); name.scope = 'row'; name.append(namedScenario(scenario)); row.append(name);
       ['total_quantity', 'total_sales', 'total_cost', 'total_profit', 'difference_from_baseline'].forEach(key => {
-        const cell = el('td', 'numeric' + (key === 'total_profit' ? ' profit-total-cell' : ''), money(scenario[key], key === 'total_quantity' ? 0 : 2));
+        const cell = el('td', 'numeric' + (key === 'total_profit' ? ' profit-total-cell' : ''), money(scenario[key]));
         cell.dataset.profitField = key;
         if (scenario[key] !== null && scenario[key] !== undefined && new D(scenario[key]).lt(0)) cell.classList.add('negative');
         row.append(cell);
@@ -184,7 +236,7 @@
       result.scenarios.forEach(scenario => {
         const item = scenario.rows.find(entry => entry.year === index + 1);
         ['quantity', 'sales', 'manufacturing_cost', 'profit'].forEach(key => {
-          const cell = el('td', 'numeric', money(item ? item[key] : null, key === 'quantity' ? 0 : 2));
+          const cell = el('td', 'numeric', money(item ? item[key] : null));
           cell.dataset.scenarioId = scenario.id; cell.dataset.profitField = key;
           if (item) cell.title = tooltip(scenario, item, false) + (item.issues && item.issues.length ? '\n' + issuesText(item.issues) : '');
           if (item && item[key] !== null && item[key] !== undefined && new D(item[key]).lt(0)) cell.classList.add('negative');
@@ -206,8 +258,8 @@
     const status = $('profit-analysis-status');
     status.classList.toggle('warning', !complete && anySales);
     status.textContent = !anySales ? '입력 탭에서 연차별 SF 판매수량(T)을 입력해 주세요. 판매가 없는 연도에는 0을 입력하세요.' : complete ? '모든 시나리오의 입력이 완료되었습니다. 현재 제조원가/T를 분석기간 동안 동일하게 적용합니다.' : '미입력 또는 계산 불가인 연도가 있습니다. 계산 가능한 연도만 그래프에 표시하며, 이후 누적값은 입력을 완료해야 계산됩니다.';
-    renderChart(result, false);
-    renderChart(result, true);
+    renderAnnualChart(result);
+    renderCumulativeChart(result);
     renderSummary(result);
     renderDetails(result);
   }

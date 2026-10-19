@@ -198,7 +198,6 @@
     $('profit-years').value = String(settings.years);
     $('sf-custom').checked = active().sales_forecast.use_custom;
     $('sf-input-card').hidden = !settings.enabled;
-    $('sf-legacy-notice').hidden = !settings.legacy_amount_forecast;
     const existing = $('tab-button-profit');
     if (settings.enabled && !existing) {
       const button = $('profit-tab-template').content.firstElementChild.cloneNode(true);
