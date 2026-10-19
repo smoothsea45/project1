@@ -355,6 +355,8 @@ test('JSON roundtrip preserves distinct packaging forms, Unicode and multiline t
 test('existing schema version 1 files and browser drafts normalize missing packaging forms', () => {
   const legacy = E.createExampleProject();
   legacy.schema_version = 1;
+  delete legacy.profit_analysis;
+  legacy.scenarios.forEach(item => { delete item.sales_forecast; });
   legacy.scenarios.forEach(item => { delete item.packaging_form; delete item.pricing_conditions; });
   const before = JSON.stringify(legacy);
   const loaded = E.parseProject(before);
@@ -363,6 +365,8 @@ test('existing schema version 1 files and browser drafts normalize missing packa
   assert.equal(JSON.stringify(legacy), before);
   const withoutAddedField = JSON.parse(JSON.stringify(loaded));
   withoutAddedField.schema_version = 1;
+  delete withoutAddedField.profit_analysis;
+  withoutAddedField.scenarios.forEach(item => { delete item.sales_forecast; });
   withoutAddedField.scenarios.forEach(item => { delete item.packaging_form; delete item.pricing_conditions; });
   assert.deepEqual(withoutAddedField, legacy);
   equal(E.calculate(loaded.scenarios[0]).total_cost, '80');

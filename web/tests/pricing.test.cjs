@@ -401,7 +401,7 @@ test('automatic calculation is pure and retains official regulation provenance',
   assert.ok(pricing.steps.length > 0);
 });
 
-test('JSON version 2 roundtrip retains mode, separate manual price, conditions and selected year', () => {
+test('JSON version 3 roundtrip retains mode, separate manual price, conditions and selected year', () => {
   const data = scenario({ company_type: 'innovative' }, {
     company_eligible: true, domestic_extension: true,
     supply_category: 'api_self', supply_eligible: true,
@@ -409,7 +409,7 @@ test('JSON version 2 roundtrip retains mode, separate manual price, conditions a
   });
   const project = E.makeProject({ scenarios: [data] });
   const loaded = E.parseProject(E.serializeProject(project));
-  assert.equal(loaded.schema_version, 2);
+  assert.equal(loaded.schema_version, E.VERSION);
   assert.deepEqual(loaded, project);
   assert.equal(loaded.scenarios[0].manual_price, '300');
   assert.equal(loaded.scenarios[0].pricing_conditions.selected_year, 7);
@@ -473,11 +473,13 @@ test('version 1 migration preserves manual pricing and ambiguous choices without
     pricing_flags: ['originator_data', 'improved', 'api_self', 'domestic_essential']
   })] });
   project.schema_version = 1;
+  delete project.profit_analysis;
+  project.scenarios.forEach(item => { delete item.sales_forecast; });
   delete project.scenarios[0].pricing_conditions;
   const originalText = JSON.stringify(project);
   const loaded = E.parseProject(originalText);
   assert.equal(JSON.stringify(project), originalText);
-  assert.equal(loaded.schema_version, 2);
+  assert.equal(loaded.schema_version, E.VERSION);
   const migrated = loaded.scenarios[0];
   equal(E.calculate(migrated).pricing.amount, 300);
   assert.equal(migrated.manual_price, '300');

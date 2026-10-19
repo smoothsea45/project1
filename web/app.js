@@ -2,8 +2,10 @@
 (function () {
   'use strict';
   const E = window.PharmaCost;
+  const F = window.PharmaProfit;
+  const ProfitView = window.PharmaProfitView;
   const $ = id => document.getElementById(id);
-  if (!E) { $('app-status').textContent = '계산 파일을 불러오지 못했습니다. ZIP 전체를 압축 해제했는지 확인하세요.'; return; }
+  if (!E || !F || !ProfitView) { $('app-status').textContent = '계산·화면 파일을 불러오지 못했습니다. ZIP 전체를 압축 해제했는지 확인하세요.'; return; }
   const D = window.Decimal;
   const STORAGE_KEY = 'pharma-cost-web-draft-v1';
   const COMPARISON_YEAR_COUNT = 8;
@@ -13,6 +15,7 @@
   let dirty = false;
   let selectedRows = new Set();
   let currentResult;
+  let currentProfitResult;
   // The comparison preview starts at year 1 independently of the input-page selection.
   const comparisonYears = new Map();
   let draggingScenarioId = null;
@@ -187,6 +190,79 @@
       else if (input.inputMode === 'decimal') setNumericDisplay(input, value);
       else input.value = value === null || value === undefined ? '' : value;
     });
+    renderProfitInputs();
+  }
+  function syncProfitControls() {
+    const settings = project.profit_analysis;
+    $('profit-enabled').checked = settings.enabled;
+    $('profit-years').value = String(settings.years);
+    $('sf-custom').checked = active().sales_forecast.use_custom;
+    $('sf-input-card').hidden = !settings.enabled;
+    const existing = $('tab-button-profit');
+    if (settings.enabled && !existing) {
+      const button = $('profit-tab-template').content.firstElementChild.cloneNode(true);
+      button.addEventListener('click', () => selectTab('profit'));
+      $('tab-button-comparison').after(button);
+    } else if (!settings.enabled && existing) {
+      if (existing.getAttribute('aria-selected') === 'true') selectTab('input');
+      existing.remove();
+    }
+    if (!settings.enabled) $('tab-profit').hidden = true;
+  }
+  function renderProfitInputs() {
+    syncProfitControls();
+    const settings = project.profit_analysis;
+    $('sf-sales-table').style.setProperty('--sf-years', settings.years);
+    const scenario = active();
+    const head = element('tr');
+    const unit = element('th', 'SF · 백만원'); unit.scope = 'col'; head.append(unit);
+    for (let year = 1; year <= settings.years; year++) {
+      const th = element('th', year + '년차'); th.scope = 'col'; head.append(th);
+    }
+    $('sf-sales-head').replaceChildren(head);
+    $('sf-sales-body').replaceChildren();
+    for (const scope of scenario.sales_forecast.use_custom ? ['common', 'custom'] : ['common']) {
+      const row = element('tr'); row.dataset.sfScope = scope;
+      const label = element('th', scope === 'common' ? '공통 SF' : '현재 시나리오 SF');
+      label.scope = 'row'; row.append(label);
+      const values = scope === 'common' ? settings.common_sales : scenario.sales_forecast.sales;
+      for (let year = 1; year <= settings.years; year++) {
+        const td = element('td');
+        const input = element('input', undefined, 'sf-sales-input numeric');
+        input.type = 'text'; input.inputMode = 'decimal';
+        input.dataset.sfScope = scope; input.dataset.sfYear = String(year);
+        input.setAttribute('aria-label', year + '년차 ' + (scope === 'common' ? '공통 SF' : '현재 시나리오 SF') + ' 백만원');
+        input.placeholder = scope === 'common' ? 'SF 입력' : '공통값 사용';
+        setNumericDisplay(input, values[year - 1]);
+        bindNumericInput(input, value => { values[year - 1] = value; changed(); });
+        td.append(input); row.append(td);
+      }
+      $('sf-sales-body').append(row);
+    }
+  }
+  function renderProfitAnalysis() {
+    syncProfitControls();
+    $('sf-input-errors').replaceChildren();
+    $('sf-input-errors').hidden = true;
+    currentProfitResult = F.calculate(project);
+    if (!currentProfitResult.enabled) return;
+    const errors = [];
+    for (const input of $('sf-sales-body').querySelectorAll('.sf-sales-input')) {
+      input.removeAttribute('aria-invalid'); input.removeAttribute('title');
+      const year = Number(input.dataset.sfYear);
+      const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_sales : active().sales_forecast.sales;
+      try { E.parseNumber(values[year - 1]); }
+      catch (error) {
+        input.setAttribute('aria-invalid', 'true'); input.title = error.message;
+        errors.push(year + '년차 ' + (input.dataset.sfScope === 'common' ? '공통 SF' : '현재 시나리오 SF') + ': ' + error.message);
+      }
+    }
+    if (errors.length) {
+      const list = element('ul');
+      for (const message of errors) list.append(element('li', message));
+      $('sf-input-errors').append(list); $('sf-input-errors').hidden = false;
+    }
+    ProfitView.render(currentProfitResult);
   }
   function renderScenarioTabs() {
     $('scenario-tabs').replaceChildren();
@@ -387,7 +463,7 @@
     $('result-price').textContent = format(result.pricing.amount, 0, '미입력');
     $('result-rate').textContent = percentage(result.cost_rate, '계산 불가', false);
     $('batch-total-note').textContent = '배치 전체 비용 ' + format(result.batch_total) + ' 원';
-    renderPricing(result.pricing); renderComposition(result); renderComparison();
+    renderPricing(result.pricing); renderComposition(result); renderComparison(); renderProfitAnalysis();
   }
   function renderPricing(pricing) {
     const s = active();
@@ -825,11 +901,13 @@
     return chart;
   }
   function selectTab(name) {
+    if (name === 'profit' && !project.profit_analysis.enabled) name = 'input';
     document.querySelectorAll('[data-tab]').forEach(button => {
       const selected = button.dataset.tab === name; button.classList.toggle('active', selected); button.setAttribute('aria-selected', String(selected));
     });
-    for (const panel of ['input', 'results', 'comparison']) $('tab-' + panel).hidden = name !== panel;
+    for (const panel of ['input', 'results', 'comparison', 'profit']) $('tab-' + panel).hidden = name !== panel;
     document.querySelectorAll('[data-tab]').forEach(button => { button.tabIndex = button.dataset.tab === name ? 0 : -1; });
+    if (name === 'profit' && currentProfitResult && currentProfitResult.enabled) ProfitView.render(currentProfitResult);
   }
   function prepareComparisonPrint() {
     renderComparison();
@@ -868,6 +946,39 @@
     });
   }
   document.querySelectorAll('[data-tab]').forEach(button => button.addEventListener('click', () => selectTab(button.dataset.tab)));
+  $('profit-enabled').addEventListener('change', event => {
+    project.profit_analysis.enabled = event.target.checked;
+    renderProfitInputs(); changed();
+    if (project.profit_analysis.enabled) {
+      selectTab('input');
+      $('sf-sales-body').querySelector('.sf-sales-input').focus();
+    }
+  });
+  $('profit-years').addEventListener('change', event => {
+    project.profit_analysis.years = Number(event.target.value);
+    renderProfitInputs(); changed();
+  });
+  $('sf-custom').addEventListener('change', event => {
+    active().sales_forecast.use_custom = event.target.checked;
+    renderProfitInputs(); changed();
+  });
+  $('sf-sales-body').addEventListener('paste', event => {
+    const input = event.target.closest('.sf-sales-input');
+    if (!input) return;
+    const text = event.clipboardData.getData('text/plain');
+    if (!/[\t\r\n]/.test(text)) return;
+    const rows = text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').map(row => row.split('\t'));
+    if (rows.length > 1 && rows.some(row => row.length > 1)) { event.preventDefault(); showToast('SF는 한 행 또는 한 열의 판매금액을 붙여넣어 주세요.'); return; }
+    const cells = rows.length === 1 ? rows[0] : rows.map(row => row[0]);
+    const first = Number(input.dataset.sfYear) - 1;
+    if (first + cells.length > project.profit_analysis.years) { event.preventDefault(); showToast('선택한 분석기간 안에 들어가는 SF만 붙여넣어 주세요.'); return; }
+    event.preventDefault();
+    const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_sales : active().sales_forecast.sales;
+    cells.forEach((value, index) => { values[first + index] = numericEntry(value).value; });
+    renderProfitInputs(); changed();
+    const replacement = $('sf-sales-body').querySelector('[data-sf-scope="' + input.dataset.sfScope + '"][data-sf-year="' + (first + 1) + '"]');
+    if (replacement) replacement.focus();
+  });
   $('scenario-tabs').addEventListener('dragover', event => {
     const position = scenarioDropPosition(event);
     if (!position) return;
@@ -1013,11 +1124,11 @@
       selectTab(buttons[index].dataset.tab); buttons[index].focus();
     }
     if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 's') { event.preventDefault(); saveFile(); }
-    if (event.target.matches('[data-material-field]') && event.key === 'Enter') { event.preventDefault(); event.target.blur(); }
+    if (event.target.matches('[data-material-field],.sf-sales-input') && event.key === 'Enter') { event.preventDefault(); event.target.blur(); }
   });
   window.addEventListener('beforeunload', event => { if (dirty) { event.preventDefault(); event.returnValue = ''; } });
   renderAll();
   selectTab('input');
   if (loadNotice) showToast(loadNotice);
-  window.PharmaCostApp = {getProject: () => JSON.parse(JSON.stringify(project)), getResult: () => currentResult};
+  window.PharmaCostApp = {getProject: () => JSON.parse(JSON.stringify(project)), getResult: () => currentResult, getProfitResult: () => currentProfitResult};
 })();

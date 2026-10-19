@@ -445,3 +445,103 @@
   .comparison-price-chart,.comparison-price-stack,.comparison-price-fill,.comparison-cost-fill,.comparison-excess-fill,.comparison-unresolved-fill,.comparison-price-legend,.comparison-price-key,.comparison-cost-key,.comparison-excess-key,.comparison-unknown-key,.comparison-donut-year{-webkit-print-color-adjust:exact;print-color-adjust:exact}
   .comparison-composition,.composition-donut,.composition-stack,.legend-dot{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 }
+
+/* SF는 선택해서 사용하는 확장 기능입니다. 기존 원가 화면과 입력값은 유지합니다. */
+.profit-feature-toggle{display:flex;align-items:center;gap:12px;padding:0 2px 10px;color:var(--muted);font-size:10px}
+.profit-feature-toggle>label{display:inline-flex;align-items:center;gap:7px;color:var(--ink-soft);font-size:11px;font-weight:600;cursor:pointer}
+.profit-feature-toggle>label:has(input:checked){color:var(--teal-dark)}
+.sf-input-card{border-color:#c5dedc;background:#fcfefe;min-width:0}
+.sf-input-card .section-heading{align-items:center}
+.sf-period-field{display:flex;align-items:center;gap:8px;flex-shrink:0}
+.sf-period-field label{font-size:11px;color:var(--ink-soft);font-weight:600}
+.sf-period-field select{height:32px;padding:5px 28px 5px 9px;min-width:76px;font-size:12px}
+.sf-input-options{display:flex;align-items:center;flex-wrap:wrap;gap:5px 16px;padding:0 18px 10px}
+.sf-input-options .choice{padding:0;font-size:11px}
+.sf-input-options p{font-size:10px;color:var(--muted)}
+.sf-sales-scroll{border-top:1px solid #e3edec;border-radius:0 0 11px 11px}
+.sf-sales-table{width:100%;table-layout:fixed;min-width:calc(140px + var(--sf-years,8)*98px);font-variant-numeric:tabular-nums}
+.sf-sales-table th,.sf-sales-table td{border-right:1px solid #e1e9ec;border-bottom:1px solid #e7eef0;padding:7px 6px}
+.sf-sales-table th:first-child{position:sticky;left:0;z-index:1;width:140px;background:#f1f7f7;color:var(--ink-soft);text-align:left;padding-left:16px;font-size:11px;white-space:normal}
+.sf-sales-table thead th{background:#f3f8f8;text-align:center;font-size:10px}
+.sf-sales-table tbody td{background:#fff;min-width:0}
+.sf-sales-table .sf-sales-input{width:100%;height:34px;text-align:right;font-size:12px;padding:7px 6px;font-variant-numeric:tabular-nums}
+.sf-sales-table td:last-child,.sf-sales-table th:last-child{border-right:0}
+.sf-sales-table tbody tr:last-child>*{border-bottom:0}
+.sf-input-card .validation-summary{margin:10px 14px}
+.profit-results-heading{align-items:flex-start;gap:15px}
+.profit-results-heading p{line-height:1.65;max-width:950px}
+.profit-unit-note{flex-shrink:0;color:var(--muted);font-size:11px;padding-top:5px}
+.profit-analysis-status{border:1px solid #d8e8e6;border-radius:7px;background:#f4fbfa;color:var(--ink-soft);padding:10px 13px;font-size:11px;line-height:1.65}
+.profit-analysis-status.warning{border-color:#ecdcb8;background:#fffbf0;color:#8a652c}
+.profit-scenario-legend{display:flex;flex-wrap:wrap;align-items:center;gap:8px 23px;padding:3px 2px 1px}
+.profit-scenario-name{display:inline-flex;align-items:center;gap:7px;min-width:0;max-width:100%;font-size:12px;line-height:1.55;color:var(--ink);font-weight:600;overflow-wrap:anywhere}
+.profit-scenario-name>span:last-child{min-width:0;overflow-wrap:anywhere}
+.profit-color-dot{width:9px;height:9px;flex:0 0 9px;border-radius:3px;display:inline-block}
+.profit-chart-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px;min-width:0}
+.profit-chart-card{min-width:0;overflow:hidden}
+.profit-chart-card .section-heading{padding-bottom:1px}
+.profit-chart-card .section-heading>div:first-child{display:block}
+.profit-chart-card .section-note{display:block;margin-top:4px}
+.profit-chart-scroll{overflow-x:auto;scrollbar-width:thin;scrollbar-color:#c8d8de transparent;max-width:100%;padding:0 10px 10px}
+.profit-chart-svg{display:block;width:100%;height:auto;min-width:540px;font-family:inherit;overflow:visible}
+.profit-axis-unit,.profit-axis-label{font-size:11px;fill:#718792;font-variant-numeric:tabular-nums}
+.profit-gridline{stroke:#e7eef0;stroke-width:1}
+.profit-zero-line{stroke:#b6c8d0;stroke-width:1.3}
+.profit-annual-bar,.profit-zero-marker{transition:opacity .12s}
+.profit-chart-svg [data-value]:hover{opacity:.75}
+.profit-chart-svg [data-value]:focus-visible{outline:0;stroke:var(--navy);stroke-width:2.5}
+.profit-chart-empty{min-height:295px;display:flex;align-items:center;justify-content:center;max-width:420px;padding:32px;margin:auto;color:var(--muted);font-size:12px;line-height:1.8;text-align:center}
+.profit-summary-card,.profit-details-card{min-width:0;overflow:hidden}
+.profit-baseline-note{padding:0 18px 12px;color:var(--muted);font-size:10px;line-height:1.65;overflow-wrap:anywhere}
+.profit-table{font-variant-numeric:tabular-nums;min-width:760px}
+.profit-table th,.profit-table td{padding:11px 14px;border-bottom:1px solid #e7eef0;border-right:1px solid #e1e9ed;line-height:1.5}
+.profit-table th:last-child,.profit-table td:last-child{border-right:0}
+.profit-table tr:last-child td,.profit-table tbody tr:last-child th{border-bottom:0}
+.profit-table thead th{background:#f2f7f8;color:var(--ink-soft);font-size:10px}
+.profit-table tbody th{font-weight:600;text-align:left;max-width:300px}
+.profit-table .numeric{text-align:right;white-space:nowrap}
+.profit-summary-table .profit-total-cell{color:var(--teal-dark);background:#f5fbfa;font-weight:700}
+.profit-table .negative{color:var(--red)!important}
+.profit-completeness{font-size:10px;max-width:180px}
+.profit-completeness small{display:block;font-size:9px;color:var(--muted);white-space:normal;margin-top:4px;line-height:1.5}
+.profit-details-card>summary{display:flex;align-items:baseline;gap:12px;padding:14px 18px;color:var(--ink);font-size:13px;font-weight:600;cursor:pointer;list-style:none}
+.profit-details-card>summary::before{content:'＋';font-size:15px;color:var(--teal)}
+.profit-details-card[open]>summary::before{content:'−'}
+.profit-details-card>summary span{font-size:10px;color:var(--muted);font-weight:400}
+.profit-details-table{min-width:800px}
+.profit-details-table thead tr:first-child th:not(:first-child){text-align:center}
+.profit-details-table .profit-scenario-name{font-size:11px}
+.profit-details-table tbody th{width:85px;white-space:nowrap;background:#f8fbfc;font-size:11px}
+@media(max-width:1050px){
+  .profit-chart-grid{grid-template-columns:minmax(0,1fr)}
+  .profit-chart-svg{max-width:940px;margin-inline:auto}
+}
+@media(max-width:720px){
+  .profit-feature-toggle{align-items:flex-start;flex-wrap:wrap;gap:4px;padding-bottom:9px}
+  .profit-feature-toggle>span{padding-left:22px;font-size:9px;flex-basis:100%}
+  .page-tabs:has(#tab-button-profit){display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+  .page-tabs:has(#tab-button-profit) .tab{min-width:0;font-size:12px;padding:12px 10px;gap:5px}
+  .sf-input-card .section-heading{flex-wrap:wrap;gap:10px}
+  .sf-period-field{margin-left:auto}
+  .sf-input-options{padding:0 13px 10px;gap:5px}
+  .sf-input-options p{flex-basis:100%;font-size:9px;padding-left:22px}
+  .sf-sales-table th:first-child{width:112px;padding-left:12px;font-size:10px}
+  .profit-results-heading{flex-wrap:wrap;gap:0}
+  .profit-unit-note{font-size:10px;padding-top:5px}
+  .profit-analysis-status{font-size:10px;padding:9px 11px}
+  .profit-scenario-legend{gap:6px 15px}
+  .profit-scenario-name{font-size:11px}
+  .profit-chart-card .section-note{font-size:10px}
+  .profit-chart-scroll{padding:0 5px 8px}
+  .profit-chart-svg{min-width:590px}
+  .profit-chart-scroll::after{content:"좌우로 밀어 전체 연도를 확인하세요.";position:sticky;left:0;display:block;color:var(--muted);font-size:9px;text-align:center;padding:2px 0 1px}
+  .profit-chart-empty{min-height:230px;font-size:11px}
+  .profit-chart-grid{gap:11px}
+  .profit-baseline-note{padding:0 13px 10px;font-size:9px}
+  .profit-details-card>summary{padding:13px;gap:7px;flex-wrap:wrap;font-size:12px}
+  .profit-details-card>summary span{font-size:9px}
+  .profit-table th,.profit-table td{padding:10px 11px}
+}
+@media print{
+  .profit-feature-toggle,#sf-input-card,#tab-profit,#tab-profit[hidden]{display:none!important}
+}

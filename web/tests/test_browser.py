@@ -528,6 +528,9 @@ def test_legacy_multiple_drug_additions_are_preserved_without_hidden_condition_b
     add_material(page)
     payload = save_file(page, tmp_path / "before.json")
     payload["schema_version"] = 1
+    payload.pop("profit_analysis")
+    for old_scenario in payload["scenarios"]:
+        old_scenario.pop("sales_forecast")
     payload["scenarios"][0].pop("pricing_conditions")
     payload["scenarios"][0]["pricing_flags"] = ["originator_data", "api_self"]
     open_file(page, {

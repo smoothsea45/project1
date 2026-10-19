@@ -12,7 +12,7 @@
   // A separate context keeps the UI's display preferences out of calculations.
   const Decimal = DecimalLibrary.clone({ precision: 256, rounding: DecimalLibrary.ROUND_HALF_UP });
   const FORMAT = 'pharma-cost-web-project';
-  const VERSION = 2;
+  const VERSION = 3;
   const MAX_SCENARIOS = 4;
   const SCENARIO_LIMIT_MESSAGE = '한 프로젝트의 시나리오는 최대 ' + MAX_SCENARIOS + '개까지 사용할 수 있습니다. 원본 데이터는 변경하지 않았습니다.';
   const UNITS = Object.freeze({
@@ -22,7 +22,7 @@
     usd_kg: { divisor: '1000000', foreign: true }
   });
   const FLAGS = Object.freeze(['originator_data', 'improved', 'biologic', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
-  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'pricing_conditions', 'materials'];
+  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'pricing_conditions', 'materials', 'sales_forecast'];
   const MATERIAL_KEYS = ['id', 'kind', 'name', 'supplier', 'amount', 'price', 'price_unit'];
   const NUMBER_FIELDS = ['batch_size', 'yield_percent', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor'];
   const blank = value => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
@@ -39,17 +39,30 @@
     return Object.assign({ id: newId(), kind: 'api', name: '', supplier: '', amount: null, price: null, price_unit: 'krw_g' }, supplied);
   }
 
+  function makeProfitAnalysis(options) {
+    const result = Object.assign({ enabled: false, years: 8, common_sales: Array(10).fill(null) }, options || {});
+    if (Array.isArray(result.common_sales)) result.common_sales = copy(result.common_sales);
+    return result;
+  }
+
+  function makeSalesForecast(options) {
+    const result = Object.assign({ use_custom: false, sales: Array(10).fill(null) }, options || {});
+    if (Array.isArray(result.sales)) result.sales = copy(result.sales);
+    return result;
+  }
+
   function makeScenario(options) {
     const supplied = typeof options === 'string' ? { name: options } : (options || {});
     const result = Object.assign({
       id: newId(), name: '기본안', batch_size: null, yield_percent: '100', packaging_form: '', exchange_rate: null,
       original_price: null, manual_price: null, post_price: null, target_rate: '20',
       batch_packaging: '0', batch_labor: '0', pricing_mode: 'manual', company_type: '',
-      identical_count_band: '', pricing_flags: [], pricing_conditions: Pricing.makePricingConditions(), materials: []
+      identical_count_band: '', pricing_flags: [], pricing_conditions: Pricing.makePricingConditions(), materials: [], sales_forecast: makeSalesForecast()
     }, supplied);
     result.pricing_flags = [...result.pricing_flags];
     result.pricing_conditions = Pricing.makePricingConditions(result.pricing_conditions);
     result.materials = result.materials.map(material => copy(material));
+    result.sales_forecast = makeSalesForecast(result.sales_forecast);
     return result;
   }
 
@@ -86,12 +99,16 @@
   function makeProject(options) {
     const supplied = options || {};
     if (Array.isArray(supplied.scenarios) && supplied.scenarios.length > MAX_SCENARIOS) throw new Error(SCENARIO_LIMIT_MESSAGE);
-    const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => normalizeScenario(copy(scenario))) : [makeScenario()];
+    const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => {
+      const normalized = normalizeScenario(copy(scenario));
+      if (!Object.prototype.hasOwnProperty.call(normalized, 'sales_forecast')) normalized.sales_forecast = makeSalesForecast();
+      return normalized;
+    }) : [makeScenario()];
     return Object.assign({
       format: FORMAT, schema_version: VERSION,
       product: { product_name: '', notes: '' }, scenarios,
       active_scenario_id: scenarios.length ? scenarios[0].id : '', is_example: false
-    }, supplied, { product: Object.assign({ product_name: '', notes: '' }, supplied.product || {}), scenarios });
+    }, supplied, { product: Object.assign({ product_name: '', notes: '' }, supplied.product || {}), scenarios, profit_analysis: makeProfitAnalysis(supplied.profit_analysis) });
   }
 
   function createExampleProject() {
@@ -119,6 +136,7 @@
     const original = project.scenarios.find(scenario => scenario.id === id);
     if (!original) throw new Error('복제할 시나리오를 찾지 못했습니다.');
     const duplicate = normalizeScenario(copy(original));
+    if (!Object.prototype.hasOwnProperty.call(duplicate, 'sales_forecast')) duplicate.sales_forecast = makeSalesForecast();
     duplicate.id = newId();
     duplicate.name = name === undefined ? original.name + ' · 복제' : name;
     duplicate.materials.forEach(material => { material.id = newId(); });
@@ -308,14 +326,20 @@
   }
   function migrateProject(project) {
     if (project === null || typeof project !== 'object' || Array.isArray(project)) return project;
-    if (project.format !== FORMAT || project.schema_version !== 1) return project;
+    if (project.format !== FORMAT || ![1, 2].includes(project.schema_version)) return project;
     // Never drop unknown fields or excess scenarios while upgrading an older file.
     if (!Array.isArray(project.scenarios)) return project;
     if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
+    if (Object.prototype.hasOwnProperty.call(project, 'profit_analysis')) fileError('이전 버전 파일에 지원하지 않는 이익 분석 항목이 있습니다.');
     for (const scenario of project.scenarios) {
-      if (scenario && typeof scenario === 'object' && !Array.isArray(scenario) && Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) fileError('이전 버전 파일에 지원하지 않는 약가 조건 항목이 있습니다.');
-      normalizeScenario(scenario);
+      if (scenario && typeof scenario === 'object' && !Array.isArray(scenario)) {
+        if (Object.prototype.hasOwnProperty.call(scenario, 'sales_forecast')) fileError('이전 버전 파일에 지원하지 않는 판매 예측 항목이 있습니다.');
+        if (project.schema_version === 1 && Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) fileError('이전 버전 파일에 지원하지 않는 약가 조건 항목이 있습니다.');
+        normalizeScenario(scenario, project.schema_version === 1);
+        scenario.sales_forecast = makeSalesForecast();
+      }
     }
+    project.profit_analysis = makeProfitAnalysis();
     project.schema_version = VERSION;
     return project;
   }
@@ -340,7 +364,11 @@
     if (project === null || typeof project !== 'object' || Array.isArray(project)) fileError('JSON 프로젝트 객체가 필요합니다.');
     if (project.format !== FORMAT) fileError('지원하지 않는 파일 형식입니다. 기존 데스크톱 JSON은 자동 변환하지 않습니다.');
     if (project.schema_version !== VERSION) fileError('지원하지 않는 파일 버전입니다. 지원 버전: ' + VERSION);
-    object(project, '프로젝트', ['format', 'schema_version', 'product', 'scenarios', 'active_scenario_id', 'is_example']);
+    object(project, '프로젝트', ['format', 'schema_version', 'product', 'scenarios', 'active_scenario_id', 'is_example', 'profit_analysis']);
+    object(project.profit_analysis, '이익 분석', ['enabled', 'years', 'common_sales']);
+    if (typeof project.profit_analysis.enabled !== 'boolean') fileError('이익 분석 사용 여부는 체크 여부여야 합니다.');
+    if (!Number.isInteger(project.profit_analysis.years) || project.profit_analysis.years < 1 || project.profit_analysis.years > 10) fileError('이익 분석 기간은 1~10년의 정수여야 합니다.');
+    validateSales(project.profit_analysis.common_sales, '공통 SF');
     object(project.product, '제품정보', ['product_name', 'notes']);
     string(project.product.product_name, '제품명');
     string(project.product.notes, '비고');
@@ -352,6 +380,9 @@
       const path = '시나리오 ' + (index + 1);
       normalizeScenario(scenario, false);
       object(scenario, path, SCENARIO_KEYS);
+      object(scenario.sales_forecast, path + ' 판매 예측', ['use_custom', 'sales']);
+      if (typeof scenario.sales_forecast.use_custom !== 'boolean') fileError(path + ' 개별 SF 사용 여부는 체크 여부여야 합니다.');
+      validateSales(scenario.sales_forecast.sales, path + ' SF');
       string(scenario.id, path + ' ID', true);
       if (ids.has(scenario.id)) fileError('시나리오 ID가 중복되어 있습니다.');
       ids.add(scenario.id);
@@ -389,6 +420,11 @@
     return project;
   }
 
+  function validateSales(values, path) {
+    if (!Array.isArray(values) || values.length !== 10) fileError(path + '는 10개 연차의 금액 배열이어야 합니다.');
+    values.forEach((value, index) => fileNumber(value, path + ' ' + (index + 1) + '년차'));
+  }
+
   function parseProject(text) {
     if (typeof text !== 'string') fileError('파일 내용을 읽지 못했습니다.');
     let project;
@@ -409,5 +445,5 @@
     return result;
   }
 
-  return Object.freeze({ Decimal, Pricing, makePricingConditions: Pricing.makePricingConditions, FORMAT, VERSION, MAX_SCENARIOS, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
+  return Object.freeze({ Decimal, Pricing, makePricingConditions: Pricing.makePricingConditions, FORMAT, VERSION, MAX_SCENARIOS, makeProfitAnalysis, makeSalesForecast, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
 }));
