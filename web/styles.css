@@ -468,6 +468,7 @@
 .sf-sales-table td:last-child,.sf-sales-table th:last-child{border-right:0}
 .sf-sales-table tbody tr:last-child>*{border-bottom:0}
 .sf-input-card .validation-summary{margin:10px 14px}
+.sf-legacy-notice{margin:10px 14px;padding:9px 12px;border:1px solid #ecdcb8;border-radius:6px;background:#fffbf0;color:#8a652c;font-size:11px;line-height:1.65}
 .profit-results-heading{align-items:flex-start;gap:15px}
 .profit-results-heading p{line-height:1.65;max-width:950px}
 .profit-unit-note{flex-shrink:0;color:var(--muted);font-size:11px;padding-top:5px}
@@ -493,7 +494,7 @@
 .profit-chart-empty{min-height:295px;display:flex;align-items:center;justify-content:center;max-width:420px;padding:32px;margin:auto;color:var(--muted);font-size:12px;line-height:1.8;text-align:center}
 .profit-summary-card,.profit-details-card{min-width:0;overflow:hidden}
 .profit-baseline-note{padding:0 18px 12px;color:var(--muted);font-size:10px;line-height:1.65;overflow-wrap:anywhere}
-.profit-table{font-variant-numeric:tabular-nums;min-width:760px}
+.profit-table{font-variant-numeric:tabular-nums;min-width:1040px}
 .profit-table th,.profit-table td{padding:11px 14px;border-bottom:1px solid #e7eef0;border-right:1px solid #e1e9ed;line-height:1.5}
 .profit-table th:last-child,.profit-table td:last-child{border-right:0}
 .profit-table tr:last-child td,.profit-table tbody tr:last-child th{border-bottom:0}
@@ -508,7 +509,7 @@
 .profit-details-card>summary::before{content:'＋';font-size:15px;color:var(--teal)}
 .profit-details-card[open]>summary::before{content:'−'}
 .profit-details-card>summary span{font-size:10px;color:var(--muted);font-weight:400}
-.profit-details-table{min-width:800px}
+.profit-details-table{min-width:1100px}
 .profit-details-table thead tr:first-child th:not(:first-child){text-align:center}
 .profit-details-table .profit-scenario-name{font-size:11px}
 .profit-details-table tbody th{width:85px;white-space:nowrap;background:#f8fbfc;font-size:11px}

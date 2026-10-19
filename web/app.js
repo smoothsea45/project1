@@ -198,6 +198,7 @@
     $('profit-years').value = String(settings.years);
     $('sf-custom').checked = active().sales_forecast.use_custom;
     $('sf-input-card').hidden = !settings.enabled;
+    $('sf-legacy-notice').hidden = !settings.legacy_amount_forecast;
     const existing = $('tab-button-profit');
     if (settings.enabled && !existing) {
       const button = $('profit-tab-template').content.firstElementChild.cloneNode(true);
@@ -215,7 +216,7 @@
     $('sf-sales-table').style.setProperty('--sf-years', settings.years);
     const scenario = active();
     const head = element('tr');
-    const unit = element('th', 'SF · 백만원'); unit.scope = 'col'; head.append(unit);
+    const unit = element('th', 'SF · 판매수량(T)'); unit.scope = 'col'; head.append(unit);
     for (let year = 1; year <= settings.years; year++) {
       const th = element('th', year + '년차'); th.scope = 'col'; head.append(th);
     }
@@ -225,14 +226,14 @@
       const row = element('tr'); row.dataset.sfScope = scope;
       const label = element('th', scope === 'common' ? '공통 SF' : '현재 시나리오 SF');
       label.scope = 'row'; row.append(label);
-      const values = scope === 'common' ? settings.common_sales : scenario.sales_forecast.sales;
+      const values = scope === 'common' ? settings.common_quantities : scenario.sales_forecast.quantities;
       for (let year = 1; year <= settings.years; year++) {
         const td = element('td');
         const input = element('input', undefined, 'sf-sales-input numeric');
-        input.type = 'text'; input.inputMode = 'decimal';
+        input.type = 'text'; input.inputMode = 'numeric';
         input.dataset.sfScope = scope; input.dataset.sfYear = String(year);
-        input.setAttribute('aria-label', year + '년차 ' + (scope === 'common' ? '공통 SF' : '현재 시나리오 SF') + ' 백만원');
-        input.placeholder = scope === 'common' ? 'SF 입력' : '공통값 사용';
+        input.setAttribute('aria-label', year + '년차 ' + (scope === 'common' ? '공통 SF' : '현재 시나리오 SF') + ' 판매수량 T');
+        input.placeholder = scope === 'common' ? '판매수량 입력' : '공통값 사용';
         setNumericDisplay(input, values[year - 1]);
         bindNumericInput(input, value => { values[year - 1] = value; changed(); });
         td.append(input); row.append(td);
@@ -250,8 +251,8 @@
     for (const input of $('sf-sales-body').querySelectorAll('.sf-sales-input')) {
       input.removeAttribute('aria-invalid'); input.removeAttribute('title');
       const year = Number(input.dataset.sfYear);
-      const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_sales : active().sales_forecast.sales;
-      try { E.parseNumber(values[year - 1]); }
+      const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_quantities : active().sales_forecast.quantities;
+      try { E.parseQuantity(values[year - 1]); }
       catch (error) {
         input.setAttribute('aria-invalid', 'true'); input.title = error.message;
         errors.push(year + '년차 ' + (input.dataset.sfScope === 'common' ? '공통 SF' : '현재 시나리오 SF') + ': ' + error.message);
@@ -968,12 +969,12 @@
     const text = event.clipboardData.getData('text/plain');
     if (!/[\t\r\n]/.test(text)) return;
     const rows = text.replace(/\r\n/g, '\n').replace(/\n$/, '').split('\n').map(row => row.split('\t'));
-    if (rows.length > 1 && rows.some(row => row.length > 1)) { event.preventDefault(); showToast('SF는 한 행 또는 한 열의 판매금액을 붙여넣어 주세요.'); return; }
+    if (rows.length > 1 && rows.some(row => row.length > 1)) { event.preventDefault(); showToast('SF는 한 행 또는 한 열의 판매수량(T)을 붙여넣어 주세요.'); return; }
     const cells = rows.length === 1 ? rows[0] : rows.map(row => row[0]);
     const first = Number(input.dataset.sfYear) - 1;
     if (first + cells.length > project.profit_analysis.years) { event.preventDefault(); showToast('선택한 분석기간 안에 들어가는 SF만 붙여넣어 주세요.'); return; }
     event.preventDefault();
-    const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_sales : active().sales_forecast.sales;
+    const values = input.dataset.sfScope === 'common' ? project.profit_analysis.common_quantities : active().sales_forecast.quantities;
     cells.forEach((value, index) => { values[first + index] = numericEntry(value).value; });
     renderProfitInputs(); changed();
     const replacement = $('sf-sales-body').querySelector('[data-sf-scope="' + input.dataset.sfScope + '"][data-sf-year="' + (first + 1) + '"]');

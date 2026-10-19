@@ -401,7 +401,7 @@ test('automatic calculation is pure and retains official regulation provenance',
   assert.ok(pricing.steps.length > 0);
 });
 
-test('JSON version 3 roundtrip retains mode, separate manual price, conditions and selected year', () => {
+test('JSON version 4 roundtrip retains mode, separate manual price, conditions and selected year', () => {
   const data = scenario({ company_type: 'innovative' }, {
     company_eligible: true, domestic_extension: true,
     supply_category: 'api_self', supply_eligible: true,

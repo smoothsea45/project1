@@ -1,4 +1,4 @@
-/* Offline SF analysis. Sales and aggregate costs use millions of KRW (백만원). */
+/* Offline SF analysis. Inputs are integer T; revenue, costs and profit are KRW. */
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory(require('./engine.js'));
   else root.PharmaProfit = factory(root.PharmaCost);
@@ -10,24 +10,24 @@
   const blank = value => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
   const problem = (path, message) => ({ path, message, severity: 'error' });
 
-  function readSales(value, path, issues) {
+  function readQuantity(value, path, issues) {
     if (blank(value)) {
-      issues.push(problem(path, 'SF 판매금액을 입력해 주세요.'));
+      issues.push(problem(path, 'SF 판매수량(T)을 입력해 주세요.'));
       return null;
     }
-    try { return E.parseNumber(value); }
+    try { return E.parseQuantity(value); }
     catch (error) {
-      issues.push(problem(path, 'SF 판매금액: ' + error.message));
+      issues.push(problem(path, 'SF 판매수량: ' + error.message));
       return null;
     }
   }
 
-  function positivePrice(value, issues) {
+  function readPrice(value, issues) {
     if (value !== null && value !== undefined) {
       const amount = new Decimal(value);
-      if (amount.isFinite() && amount.gt(0)) return amount;
+      if (amount.isFinite() && amount.gte(0)) return amount;
     }
-    issues.push(problem('price', '해당 연차의 약가가 없거나 0이어서 이익을 계산할 수 없습니다.'));
+    issues.push(problem('price', '해당 연차의 약가 입력을 완료하면 이익을 계산할 수 있습니다.'));
     return null;
   }
 
@@ -44,15 +44,16 @@
       output.issues.push(problem('profit_analysis.years', '분석 기간은 1~10년의 정수로 입력해 주세요.'));
       return output;
     }
-    const common = Array.isArray(settings.common_sales) ? settings.common_sales : [];
+    const common = Array.isArray(settings.common_quantities) ? settings.common_quantities : [];
     for (const scenario of project.scenarios) {
       const calculated = E.calculate(scenario);
       const forecast = scenario.sales_forecast || {};
-      const custom = Array.isArray(forecast.sales) ? forecast.sales : [];
+      const custom = Array.isArray(forecast.quantities) ? forecast.quantities : [];
       const item = {
         id: scenario.id, name: scenario.name, rows: [],
-        total_sales: null, total_cost: null, total_profit: null, difference_from_baseline: null, complete: false
+        total_quantity: null, total_sales: null, total_cost: null, total_profit: null, difference_from_baseline: null, complete: false
       };
+      let cumulativeQuantity = new Decimal(0);
       let cumulativeSales = new Decimal(0);
       let cumulativeCost = new Decimal(0);
       let cumulativeProfit = new Decimal(0);
@@ -60,29 +61,31 @@
         const issues = [];
         const useCustom = forecast.use_custom === true && !blank(custom[index]);
         const source = useCustom ? 'custom' : 'common';
-        const path = useCustom ? 'scenarios.' + scenario.id + '.sales_forecast.sales.' + index : 'profit_analysis.common_sales.' + index;
-        const sales = readSales(useCustom ? custom[index] : common[index], path, issues);
+        const path = useCustom ? 'scenarios.' + scenario.id + '.sales_forecast.quantities.' + index : 'profit_analysis.common_quantities.' + index;
+        const quantity = readQuantity(useCustom ? custom[index] : common[index], path, issues);
         const forecastYear = scenario.pricing_mode === 'official' && Array.isArray(calculated.pricing.years)
           ? calculated.pricing.years.find(year => year.year === index + 1) : null;
-        const price = positivePrice(scenario.pricing_mode === 'manual' ? calculated.pricing.amount : forecastYear && forecastYear.amount, issues);
+        const price = readPrice(scenario.pricing_mode === 'manual' ? calculated.pricing.amount : forecastYear && forecastYear.amount, issues);
         const rawCost = calculated.total_cost;
         const cost = rawCost !== null && rawCost !== undefined && rawCost.isFinite() && rawCost.gte(0) ? new Decimal(rawCost) : null;
         if (cost === null) issues.push(problem('cost_per_unit', '제조원가 입력을 완료하면 이익을 계산할 수 있습니다.'));
-        const rate = price !== null && cost !== null ? cost.div(price).times(100) : null;
-        // The input unit is already 백만원; a dimensionless cost/price ratio preserves it.
-        const manufacturing = sales !== null && price !== null && cost !== null ? sales.times(cost).div(price) : null;
-        const profit = manufacturing !== null ? sales.minus(manufacturing) : null;
+        const rate = price !== null && price.gt(0) && cost !== null ? cost.div(price).times(100) : null;
+        const sales = quantity !== null && price !== null ? quantity.times(price) : null;
+        const manufacturing = quantity !== null && cost !== null ? quantity.times(cost) : null;
+        const profit = sales !== null && manufacturing !== null ? sales.minus(manufacturing) : null;
+        cumulativeQuantity = cumulativeQuantity !== null && quantity !== null ? cumulativeQuantity.plus(quantity) : null;
         cumulativeSales = cumulativeSales !== null && sales !== null ? cumulativeSales.plus(sales) : null;
         cumulativeCost = cumulativeCost !== null && manufacturing !== null ? cumulativeCost.plus(manufacturing) : null;
         cumulativeProfit = cumulativeProfit !== null && profit !== null ? cumulativeProfit.plus(profit) : null;
         item.rows.push({
-          year: index + 1, sales, price, cost_per_unit: cost, cost_rate: rate, manufacturing_cost: manufacturing, profit,
-          cumulative_sales: cumulativeSales, cumulative_cost: cumulativeCost, cumulative_profit: cumulativeProfit,
+          year: index + 1, quantity, sales, price, cost_per_unit: cost, cost_rate: rate, manufacturing_cost: manufacturing, profit,
+          cumulative_quantity: cumulativeQuantity, cumulative_sales: cumulativeSales, cumulative_cost: cumulativeCost, cumulative_profit: cumulativeProfit,
           sales_source: source, issues
         });
         output.issues.push(...issues.map(entry => Object.assign({ scenario_id: scenario.id, year: index + 1 }, entry)));
       }
       item.complete = item.rows.every(row => row.sales !== null && row.manufacturing_cost !== null && row.profit !== null);
+      item.total_quantity = item.complete ? cumulativeQuantity : null;
       item.total_sales = item.complete ? cumulativeSales : null;
       item.total_cost = item.complete ? cumulativeCost : null;
       item.total_profit = item.complete ? cumulativeProfit : null;

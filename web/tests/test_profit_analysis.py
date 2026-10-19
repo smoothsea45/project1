@@ -22,7 +22,7 @@ from web.tests.test_scenario_reorder import native_drag
 from web.tests.test_tabs_print import clone
 
 
-def sales(page, year=1, custom=False):
+def quantities(page, year=1, custom=False):
     scope = "custom" if custom else "common"
     return page.locator(f'.sf-sales-input[data-sf-scope="{scope}"][data-sf-year="{year}"]')
 
@@ -78,40 +78,57 @@ def test_feature_starts_off_and_checkbox_adds_only_the_optional_fourth_tab(page)
     assert scenario(page) == before
     analysis(page)
     expect(page.locator("#tab-profit")).to_contain_text("제조원가")
-    expect(page.locator("#tab-profit")).to_contain_text("백만원")
+    expect(page.locator("#tab-profit")).to_contain_text("단위: 원")
+    assert "백만원" not in page.locator("#tab-profit").inner_text()
+    expect(page.locator("#sf-input-card")).to_contain_text("T")
 
 
-def test_actual_sales_drives_cost_profit_and_both_real_svg_charts(page):
+def test_actual_quantity_drives_sales_cost_profit_and_both_real_svg_charts_in_won(page):
     setup_base(page)  # Unit manufacturing cost 30 KRW.
     page.locator("#manual-price").fill("100")
     enable(page, 1)
-    sales(page).fill("1000")
+    quantities(page).fill("1000")
     current_id = scenario(page)["id"]
     row = profit_scenario(page)["rows"][0]
-    assert Decimal(row["sales"]) == 1000
-    assert Decimal(row["manufacturing_cost"]) == 300
-    assert Decimal(row["profit"]) == 700
+    assert Decimal(row["quantity"]) == 1000
+    assert Decimal(row["sales"]) == 100000
+    assert Decimal(row["manufacturing_cost"]) == 30000
+    assert Decimal(row["profit"]) == 70000
     assert Decimal(row["cost_rate"]) == 30
     analysis(page)
     for kind in ["annual", "cumulative"]:
-        expect(mark(page, kind, current_id, 1)).to_have_attribute("data-value", "700")
+        expect(mark(page, kind, current_id, 1)).to_have_attribute("data-value", "70000")
         expect(mark(page, kind, current_id, 1)).to_be_visible()
     summary = page.locator(f'#profit-summary-body tr[data-scenario-id="{current_id}"]')
     expect(summary).to_contain_text("1,000")
-    expect(summary).to_contain_text("300")
-    expect(summary).to_contain_text("700")
+    expect(summary).to_contain_text("100,000")
+    expect(summary).to_contain_text("30,000")
+    expect(summary).to_contain_text("70,000")
     assert_clean_analysis(page)
+    page.locator("#tab-button-input").click()
+    page.locator("#manual-price").fill("200")
+    expect(quantities(page)).to_have_value("1,000")
+    updated = profit_scenario(page)["rows"][0]
+    assert updated["quantity"] == "1000"
+    assert updated["sales"] == "200000"
+    assert updated["manufacturing_cost"] == "30000"
+    assert updated["profit"] == "170000"
+    analysis(page)
+    for kind in ["annual", "cumulative"]:
+        expect(mark(page, kind, current_id, 1)).to_have_attribute("data-value", "170000")
 
 
-def test_profit_uses_unrounded_cost_rate_and_does_not_modify_existing_price_selection(page):
+def test_profit_uses_unrounded_unit_cost_and_does_not_modify_existing_price_selection(page):
     setup_base(page)
-    add_material(page)  # Unit cost 50, price300: exact ratio1/6, not displayed16.7%.
+    add_material(page, amount="20.123456789", price="1000000")
+    # Unit cost50.123456789 must be multiplied before display rounding.
     enable(page, 1)
-    sales(page).fill("100")
+    quantities(page).fill("100")
     before = copy.deepcopy(scenario(page))
     row = profit_scenario(page)["rows"][0]
-    assert abs(Decimal(row["profit"]) - Decimal(250) / Decimal(3)) < Decimal("1e-20")
-    assert Decimal(row["profit"]) != Decimal("83.3")
+    assert Decimal(row["manufacturing_cost"]) == Decimal("5012.3456789")
+    assert Decimal(row["profit"]) == Decimal("24987.6543211")
+    assert Decimal(row["profit"]) != Decimal("24988")
     analysis(page)
     assert scenario(page) == before
     assert_clean_analysis(page)
@@ -122,7 +139,7 @@ def test_selected_analysis_period_controls_real_input_and_graph_years(page, year
     setup_base(page)
     enable(page, years)
     for year in range(1, years + 1):
-        sales(page, year).fill(str(year * 100))
+        quantities(page, year).fill(str(year * 100))
     current_id = scenario(page)["id"]
     analysis(page)
     expected = list(range(1, years + 1))
@@ -134,71 +151,72 @@ def test_selected_analysis_period_controls_real_input_and_graph_years(page, year
     result = profit_scenario(page)
     assert len(result["rows"]) == years
     assert result["complete"]
-    assert Decimal(result["total_sales"]) == sum(year * 100 for year in expected)
+    assert Decimal(result["total_quantity"]) == sum(year * 100 for year in expected)
+    assert Decimal(result["total_sales"]) == sum(year * 100 * 300 for year in expected)
 
 
 def test_hiding_feature_or_shortening_period_preserves_hidden_values_and_returns_to_input(page):
     setup_base(page)
     enable(page)
-    sales(page, 1).fill("1234.56789")
-    sales(page, 8).fill("8888")
+    quantities(page, 1).fill("123456789")
+    quantities(page, 8).fill("8888")
     page.locator("#profit-years").select_option("3")
-    expect(sales(page, 8)).to_have_count(0)
-    assert project(page)["profit_analysis"]["common_sales"][7] == "8888"
+    expect(quantities(page, 8)).to_have_count(0)
+    assert project(page)["profit_analysis"]["common_quantities"][7] == "8888"
     page.locator("#profit-years").select_option("8")
-    expect(sales(page, 8)).to_have_value("8,888")
+    expect(quantities(page, 8)).to_have_value("8,888")
     analysis(page)
     page.locator("#profit-enabled").uncheck()
     expect(page.locator("#tab-input")).to_be_visible()
     expect(page.locator("#sf-input-card")).to_be_hidden()
     expect(page.locator("#tab-button-profit")).to_be_hidden()
     enable(page)
-    expect(sales(page, 1)).to_have_value("1,234.56789")
-    expect(sales(page, 8)).to_have_value("8,888")
+    expect(quantities(page, 1)).to_have_value("123,456,789")
+    expect(quantities(page, 8)).to_have_value("8,888")
 
 
-def test_common_sales_are_shared_and_custom_blank_falls_back_while_zero_overrides(page):
+def test_common_quantities_are_shared_and_custom_blank_falls_back_while_zero_overrides(page):
     setup_base(page)
     first_id = scenario(page)["id"]
     second_id = clone(page, "개별 SF 검토")
     enable(page, 3)
     for year, amount in [(1, "1000"), (2, "2000"), (3, "3000")]:
-        sales(page, year).fill(amount)
-    assert [row["sales"] for row in profit_scenario(page, first_id)["rows"]] == ["1000", "2000", "3000"]
+        quantities(page, year).fill(amount)
+    assert [row["quantity"] for row in profit_scenario(page, first_id)["rows"]] == ["1000", "2000", "3000"]
     page.locator("#sf-custom").check()
-    sales(page, 1, custom=True).fill("1500")
-    sales(page, 3, custom=True).fill("0")
+    quantities(page, 1, custom=True).fill("1500")
+    quantities(page, 3, custom=True).fill("0")
     rows = profit_scenario(page, second_id)["rows"]
-    assert [row["sales"] for row in rows] == ["1500", "2000", "0"]
+    assert [row["quantity"] for row in rows] == ["1500", "2000", "0"]
     assert [row["sales_source"] for row in rows] == ["custom", "common", "custom"]
-    assert [row["sales"] for row in profit_scenario(page, first_id)["rows"]] == ["1000", "2000", "3000"]
+    assert [row["quantity"] for row in profit_scenario(page, first_id)["rows"]] == ["1000", "2000", "3000"]
     select_scenario(page, first_id)
     expect(page.locator("#sf-custom")).not_to_be_checked()
     select_scenario(page, second_id)
     expect(page.locator("#sf-custom")).to_be_checked()
     page.locator("#sf-custom").uncheck()
-    assert [row["sales"] for row in profit_scenario(page)["rows"]] == ["1000", "2000", "3000"]
+    assert [row["quantity"] for row in profit_scenario(page)["rows"]] == ["1000", "2000", "3000"]
     page.locator("#sf-custom").check()
-    expect(sales(page, 1, custom=True)).to_have_value("1,500")
-    expect(sales(page, 3, custom=True)).to_have_value("0")
+    expect(quantities(page, 1, custom=True)).to_have_value("1,500")
+    expect(quantities(page, 3, custom=True)).to_have_value("0")
 
 
-def test_excel_sales_rows_and_columns_paste_as_real_forecasts_and_reject_overflow_or_matrix(page):
+def test_excel_quantity_rows_and_columns_paste_as_real_forecasts_and_reject_overflow_or_matrix(page):
     setup_base(page)
     enable(page, 3)
 
     def paste(text):
         page.evaluate("text => navigator.clipboard.writeText(text)", text)
-        sales(page).focus()
+        quantities(page).focus()
         page.keyboard.press("Control+V")
 
     paste("1000\t2000\t3000")
-    expect(sales(page, 1)).to_have_value("1,000")
-    expect(sales(page, 3)).to_have_value("3,000")
-    assert [row["profit"] for row in profit_scenario(page)["rows"]] == ["900", "1800", "2700"]
+    expect(quantities(page, 1)).to_have_value("1,000")
+    expect(quantities(page, 3)).to_have_value("3,000")
+    assert [row["profit"] for row in profit_scenario(page)["rows"]] == ["270000", "540000", "810000"]
     paste("4000\n5000\n6000")
-    expect(sales(page, 1)).to_have_value("4,000")
-    expect(sales(page, 3)).to_have_value("6,000")
+    expect(quantities(page, 1)).to_have_value("4,000")
+    expect(quantities(page, 3)).to_have_value("6,000")
     before = project(page)
     paste("1\t2\t3\t4")
     assert project(page) == before
@@ -206,7 +224,7 @@ def test_excel_sales_rows_and_columns_paste_as_real_forecasts_and_reject_overflo
     assert project(page) == before
     analysis(page)
     current_id = scenario(page)["id"]
-    expect(mark(page, "annual", current_id, 3)).to_have_attribute("data-value", "5400")
+    expect(mark(page, "annual", current_id, 3)).to_have_attribute("data-value", "1620000")
 
 
 def test_real_annual_pricing_changes_profit_after_four_years_without_mutating_input_year(page):
@@ -216,11 +234,14 @@ def test_real_annual_pricing_changes_profit_after_four_years_without_mutating_in
     page.locator('[data-pricing-year="10"]').click()
     enable(page, 5)
     for year in range(1, 6):
-        sales(page, year).fill("1000")
+        quantities(page, year).fill("1000")
     before = copy.deepcopy(scenario(page))
     current_id = before["id"]
     rows = profit_scenario(page)["rows"]
     assert [row["price"] for row in rows] == ["600"] * 4 + ["383"]
+    assert [row["quantity"] for row in rows] == ["1000"] * 5
+    assert [row["manufacturing_cost"] for row in rows] == ["50000"] * 5
+    assert [row["sales"] for row in rows] == ["600000"] * 4 + ["383000"]
     assert Decimal(rows[4]["profit"]) < Decimal(rows[3]["profit"])
     analysis(page)
     assert Decimal(mark(page, "annual", current_id, 5).get_attribute("data-value")) < Decimal(
@@ -231,14 +252,15 @@ def test_real_annual_pricing_changes_profit_after_four_years_without_mutating_in
     expect(page.locator('[data-pricing-year="10"]')).to_have_attribute("aria-pressed", "true")
 
 
-def test_blank_sales_are_unknown_zero_sales_are_valid_and_cumulative_never_bridges_gap(page):
+def test_blank_quantities_are_unknown_zero_quantities_are_valid_and_cumulative_never_bridges_gap(page):
     setup_base(page)
     enable(page, 3)
-    sales(page, 1).fill("0")
-    sales(page, 3).fill("1000")
+    quantities(page, 1).fill("0")
+    quantities(page, 3).fill("1000")
     current_id = scenario(page)["id"]
     result = profit_scenario(page)
     assert result["rows"][0]["profit"] == "0"
+    assert result["rows"][1]["quantity"] is None
     assert result["rows"][1]["sales"] is None
     assert result["rows"][1]["profit"] is None
     assert result["rows"][2]["profit"] is not None
@@ -255,12 +277,12 @@ def test_blank_sales_are_unknown_zero_sales_are_valid_and_cumulative_never_bridg
     assert_clean_analysis(page)
 
 
-@pytest.mark.parametrize("value", ["-1", "not-a-number"])
-def test_invalid_sales_are_marked_and_never_rendered_as_real_profit(page, value):
+@pytest.mark.parametrize("value", ["-1", "not-a-number", "1.5"])
+def test_invalid_or_fractional_quantities_are_marked_and_never_rendered_as_real_profit(page, value):
     setup_base(page)
     enable(page, 1)
-    sales(page).fill(value)
-    expect(sales(page)).to_have_attribute("aria-invalid", "true")
+    quantities(page).fill(value)
+    expect(quantities(page)).to_have_attribute("aria-invalid", "true")
     result = profit_scenario(page)
     assert result["rows"][0]["profit"] is None
     assert result["total_profit"] is None
@@ -270,17 +292,30 @@ def test_invalid_sales_are_marked_and_never_rendered_as_real_profit(page, value)
     assert_clean_analysis(page)
 
 
-@pytest.mark.parametrize("price", ["0", ""])
-def test_missing_or_zero_price_is_unavailable_without_nan_or_assumed_full_profit(page, price):
+@pytest.mark.parametrize("price,quantity", [("", "1000"), ("0", "1000"), ("0", "0")])
+def test_missing_price_is_unavailable_but_valid_zero_price_retains_real_cost_and_loss(page, price, quantity):
     setup_base(page)
     page.locator("#manual-price").fill(price)
     enable(page, 1)
-    sales(page).fill("1000")
+    quantities(page).fill(quantity)
     result = profit_scenario(page)
-    assert result["rows"][0]["profit"] is None
-    assert result["total_profit"] is None
+    row = result["rows"][0]
+    if price == "":
+        assert row["profit"] is None
+        assert result["total_profit"] is None
+    else:
+        assert row["sales"] == "0"
+        assert Decimal(row["manufacturing_cost"]) == Decimal(quantity) * 30
+        assert Decimal(row["profit"]) == Decimal(quantity) * -30
+        assert row["cost_rate"] is None
+        assert result["complete"]
     analysis(page)
-    expect(page.locator('#profit-annual-chart svg [data-kind="annual"]')).to_have_count(0)
+    marks = page.locator('#profit-annual-chart svg [data-kind="annual"]')
+    if price == "":
+        expect(marks).to_have_count(0)
+    else:
+        expected = str(Decimal(quantity) * -30) if Decimal(quantity) else "0"
+        expect(marks).to_have_attribute("data-value", expected)
     assert_clean_analysis(page)
 
 
@@ -289,34 +324,34 @@ def test_losses_appear_below_zero_and_scenarios_share_a_real_scale(page):
     page.locator("#manual-price").fill("100")
     positive_id = scenario(page)["id"]
     negative_id = clone(page, "적자 검토안")
-    page.locator("#manual-price").fill("10")  # Cost30 / price10 =300%; profit-2000.
+    page.locator("#manual-price").fill("10")  # Cost30 / price10 =300%; 1000T profit-20000.
     enable(page, 1)
-    sales(page).fill("1000")
+    quantities(page).fill("1000")
     analysis(page)
     positive = mark(page, "annual", positive_id, 1)
     negative = mark(page, "annual", negative_id, 1)
-    expect(positive).to_have_attribute("data-value", "700")
-    expect(negative).to_have_attribute("data-value", "-2000")
+    expect(positive).to_have_attribute("data-value", "70000")
+    expect(negative).to_have_attribute("data-value", "-20000")
     positive_geometry = positive.evaluate("node => ({y:+node.getAttribute('y'),height:+node.getAttribute('height')})")
     negative_geometry = negative.evaluate("node => ({y:+node.getAttribute('y'),height:+node.getAttribute('height')})")
     baseline = positive_geometry["y"] + positive_geometry["height"]
     assert abs(negative_geometry["y"] - baseline) < 0.1
     assert negative_geometry["height"] > 0
-    assert abs(negative_geometry["height"] / positive_geometry["height"] - 2000 / 700) < 0.01
+    assert abs(negative_geometry["height"] / positive_geometry["height"] - 20000 / 70000) < 0.01
     assert_clean_analysis(page)
 
 
 def test_cloning_custom_sales_is_independent_and_tab_drag_updates_summary_and_graph_order(page):
     setup_base(page)
     enable(page, 1)
-    sales(page).fill("1000")
+    quantities(page).fill("1000")
     page.locator("#sf-custom").check()
-    sales(page, custom=True).fill("1200")
+    quantities(page, custom=True).fill("1200")
     first_id = scenario(page)["id"]
     second_id = clone(page, "복제 SF 검토안")
-    expect(sales(page, custom=True)).to_have_value("1,200")
-    sales(page, custom=True).fill("2000")
-    assert profit_scenario(page, first_id)["rows"][0]["sales"] == "1200"
+    expect(quantities(page, custom=True)).to_have_value("1,200")
+    quantities(page, custom=True).fill("2000")
+    assert profit_scenario(page, first_id)["rows"][0]["quantity"] == "1200"
     analysis(page)
     colors = {
         key: mark(page, "annual", key, 1).get_attribute("fill")
@@ -336,7 +371,7 @@ def test_cloning_custom_sales_is_independent_and_tab_drag_updates_summary_and_gr
 def test_deleting_and_replacing_a_scenario_keeps_four_distinct_colors_and_reorder_preserves_them(page):
     setup_base(page)
     enable(page, 1)
-    sales(page).fill("1000")
+    quantities(page).fill("1000")
     ids = [scenario(page)["id"]]
     for number in range(2, 5):
         ids.append(clone(page, f"색상 비교 {number}안"))
@@ -367,15 +402,15 @@ def test_deleting_and_replacing_a_scenario_keeps_four_distinct_colors_and_reorde
 def test_json_save_open_and_browser_draft_retain_disabled_sf_settings_and_exact_input(page, tmp_path):
     setup_base(page)
     enable(page, 10)
-    sales(page, 10).fill("1234567.890123456789")
+    quantities(page, 10).fill("1234567890123456789")
     page.locator("#sf-custom").check()
-    sales(page, 2, custom=True).fill("0")
+    quantities(page, 2, custom=True).fill("0")
     page.locator("#profit-enabled").uncheck()
     original = project(page)
     filename = tmp_path / "sf-project.json"
     assert save_file(page, filename) == original
-    assert original["schema_version"] == 3
-    assert original["profit_analysis"]["common_sales"][9] == "1234567.890123456789"
+    assert original["schema_version"] == 4
+    assert original["profit_analysis"]["common_quantities"][9] == "1234567890123456789"
     page.reload()
     page.wait_for_function("Boolean(window.PharmaCostApp)")
     assert project(page) == original
@@ -383,9 +418,9 @@ def test_json_save_open_and_browser_draft_retain_disabled_sf_settings_and_exact_
     open_file(page, filename)
     assert project(page) == original
     enable(page, 10)
-    expect(sales(page, 10)).to_have_value("1,234,567.890123456789")
+    expect(quantities(page, 10)).to_have_value("1,234,567,890,123,456,789")
     expect(page.locator("#sf-custom")).to_be_checked()
-    expect(sales(page, 2, custom=True)).to_have_value("0")
+    expect(quantities(page, 2, custom=True)).to_have_value("0")
 
 
 def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(page, tmp_path):
@@ -400,13 +435,58 @@ def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(p
     filename.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
     open_file(page, filename)
     migrated = project(page)
-    assert migrated["schema_version"] == 3
-    assert migrated["profit_analysis"] == {"enabled": False, "years": 8, "common_sales": [None] * 10}
+    assert migrated["schema_version"] == 4
+    assert migrated["profit_analysis"] == {
+        "enabled": False,
+        "years": 8,
+        "common_quantities": [None] * 10,
+        "legacy_amount_forecast": None,
+    }
     for old, new in zip(legacy["scenarios"], migrated["scenarios"]):
         assert {key: value for key, value in new.items() if key != "sales_forecast"} == old
     expect(page.locator("#profit-enabled")).not_to_be_checked()
     expect(page.locator("#tab-button-profit")).to_be_hidden()
     expect(page.locator('[data-material-field="amount"]')).to_have_value("20.123456")
+
+
+def test_old_amount_forecast_is_archived_with_notice_and_never_reinterpreted_as_quantity(page, tmp_path):
+    setup_base(page)
+    legacy = save_file(page, tmp_path / "before-old-sf.json")
+    legacy["schema_version"] = 3
+    old_common = ["1000", None, "2000"] + [None] * 7
+    old_custom = ["1500", None, "0"] + [None] * 7
+    legacy["profit_analysis"] = {"enabled": True, "years": 3, "common_sales": old_common}
+    for item in legacy["scenarios"]:
+        item["sales_forecast"] = {"use_custom": True, "sales": old_custom}
+    filename = tmp_path / "cash-based-v3.json"
+    filename.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
+    open_file(page, filename)
+    expect(page.locator("#profit-enabled")).to_be_checked()
+    expect(page.locator("#profit-years")).to_have_value("3")
+    expect(page.locator("#sf-legacy-notice")).to_be_visible()
+    for year in range(1, 4):
+        expect(quantities(page, year)).to_have_value("")
+        expect(quantities(page, year, custom=True)).to_have_value("")
+    migrated = project(page)
+    assert migrated["schema_version"] == 4
+    assert migrated["profit_analysis"]["common_quantities"] == [None] * 10
+    archived = migrated["profit_analysis"]["legacy_amount_forecast"]
+    assert archived == {
+        "unit": "million_krw",
+        "common_sales": old_common,
+        "scenarios": [
+            {"scenario_id": item["id"], "use_custom": True, "sales": old_custom}
+            for item in legacy["scenarios"]
+        ],
+    }
+    assert profit_scenario(page)["rows"][0]["quantity"] is None
+    assert profit_scenario(page)["total_profit"] is None
+    saved = save_file(page, tmp_path / "archived-v4.json")
+    assert saved["profit_analysis"]["legacy_amount_forecast"] == archived
+    page.reload()
+    page.wait_for_function("Boolean(window.PharmaCostApp)")
+    expect(page.locator("#sf-legacy-notice")).to_be_visible()
+    assert project(page)["profit_analysis"]["legacy_amount_forecast"] == archived
 
 
 @pytest.mark.parametrize("width", [390, 1440])
@@ -417,7 +497,7 @@ def test_optional_inputs_and_profit_charts_remain_within_mobile_and_desktop_page
         clone(page, f"판매 예측 비교 시나리오 {index + 2}")
     enable(page, 10)
     for year in range(1, 11):
-        sales(page, year).fill(str(year * 1000))
+        quantities(page, year).fill(str(year * 1000000))
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
     analysis(page)
     assert page.evaluate("document.documentElement.scrollWidth <= innerWidth + 1")
@@ -425,5 +505,20 @@ def test_optional_inputs_and_profit_charts_remain_within_mobile_and_desktop_page
         chart = page.locator(f"#profit-{host}-chart")
         expect(chart.locator("svg")).to_be_visible()
         expect(chart.locator("svg")).to_have_attribute("role", "img")
-        assert chart.locator("svg").get_attribute("aria-label")
+        assert "원" in chart.locator("svg").get_attribute("aria-label")
+        bounds = chart.locator("svg").bounding_box()
+        labels = chart.locator("svg text").all()
+        boxes = []
+        for label in labels:
+            box = label.bounding_box()
+            assert box["x"] >= bounds["x"] - 1
+            assert box["x"] + box["width"] <= bounds["x"] + bounds["width"] + 1
+            assert box["y"] >= bounds["y"] - 1
+            assert box["y"] + box["height"] <= bounds["y"] + bounds["height"] + 1
+            boxes.append(box)
+        for index, first in enumerate(boxes):
+            for second in boxes[index + 1:]:
+                horizontal = min(first["x"] + first["width"], second["x"] + second["width"]) - max(first["x"], second["x"])
+                vertical = min(first["y"] + first["height"], second["y"] + second["height"]) - max(first["y"], second["y"])
+                assert horizontal <= 0.5 or vertical <= 0.5, "Profit axis labels overlap"
     assert_clean_analysis(page)

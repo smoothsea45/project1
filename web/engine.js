@@ -12,7 +12,7 @@
   // A separate context keeps the UI's display preferences out of calculations.
   const Decimal = DecimalLibrary.clone({ precision: 256, rounding: DecimalLibrary.ROUND_HALF_UP });
   const FORMAT = 'pharma-cost-web-project';
-  const VERSION = 3;
+  const VERSION = 4;
   const MAX_SCENARIOS = 4;
   const SCENARIO_LIMIT_MESSAGE = '한 프로젝트의 시나리오는 최대 ' + MAX_SCENARIOS + '개까지 사용할 수 있습니다. 원본 데이터는 변경하지 않았습니다.';
   const UNITS = Object.freeze({
@@ -40,14 +40,15 @@
   }
 
   function makeProfitAnalysis(options) {
-    const result = Object.assign({ enabled: false, years: 8, common_sales: Array(10).fill(null) }, options || {});
-    if (Array.isArray(result.common_sales)) result.common_sales = copy(result.common_sales);
+    const result = Object.assign({ enabled: false, years: 8, common_quantities: Array(10).fill(null), legacy_amount_forecast: null }, options || {});
+    if (Array.isArray(result.common_quantities)) result.common_quantities = copy(result.common_quantities);
+    if (result.legacy_amount_forecast !== null && typeof result.legacy_amount_forecast === 'object') result.legacy_amount_forecast = copy(result.legacy_amount_forecast);
     return result;
   }
 
   function makeSalesForecast(options) {
-    const result = Object.assign({ use_custom: false, sales: Array(10).fill(null) }, options || {});
-    if (Array.isArray(result.sales)) result.sales = copy(result.sales);
+    const result = Object.assign({ use_custom: false, quantities: Array(10).fill(null) }, options || {});
+    if (Array.isArray(result.quantities)) result.quantities = copy(result.quantities);
     return result;
   }
 
@@ -326,10 +327,33 @@
   }
   function migrateProject(project) {
     if (project === null || typeof project !== 'object' || Array.isArray(project)) return project;
-    if (project.format !== FORMAT || ![1, 2].includes(project.schema_version)) return project;
+    if (project.format !== FORMAT || ![1, 2, 3].includes(project.schema_version)) return project;
     // Never drop unknown fields or excess scenarios while upgrading an older file.
     if (!Array.isArray(project.scenarios)) return project;
     if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
+    if (project.schema_version === 3) {
+      // Amount-based SF is archived losslessly; an amount must never become a sales quantity.
+      const settings = project.profit_analysis;
+      object(settings, '이전 이익 분석', ['enabled', 'years', 'common_sales']);
+      validateProfitHeader(settings);
+      validateForecastValues(settings.common_sales, '이전 공통 SF 금액');
+      const archivedScenarios = project.scenarios.map((scenario, index) => {
+        object(scenario, '이전 시나리오 ' + (index + 1), SCENARIO_KEYS);
+        const forecast = scenario.sales_forecast;
+        object(forecast, '이전 시나리오 판매 예측', ['use_custom', 'sales']);
+        if (typeof forecast.use_custom !== 'boolean') fileError('이전 개별 SF 사용 여부는 체크 여부여야 합니다.');
+        validateForecastValues(forecast.sales, '이전 시나리오 SF 금액');
+        return { scenario_id: scenario.id, use_custom: forecast.use_custom, sales: copy(forecast.sales) };
+      });
+      const hasAmounts = settings.common_sales.some(value => !blank(value)) || archivedScenarios.some(scenario => scenario.sales.some(value => !blank(value)));
+      project.profit_analysis = makeProfitAnalysis({
+        enabled: settings.enabled, years: settings.years,
+        legacy_amount_forecast: hasAmounts ? { unit: 'million_krw', common_sales: copy(settings.common_sales), scenarios: archivedScenarios } : null
+      });
+      project.scenarios.forEach(scenario => { scenario.sales_forecast = makeSalesForecast({ use_custom: scenario.sales_forecast.use_custom }); });
+      project.schema_version = VERSION;
+      return project;
+    }
     if (Object.prototype.hasOwnProperty.call(project, 'profit_analysis')) fileError('이전 버전 파일에 지원하지 않는 이익 분석 항목이 있습니다.');
     for (const scenario of project.scenarios) {
       if (scenario && typeof scenario === 'object' && !Array.isArray(scenario)) {
@@ -365,10 +389,10 @@
     if (project.format !== FORMAT) fileError('지원하지 않는 파일 형식입니다. 기존 데스크톱 JSON은 자동 변환하지 않습니다.');
     if (project.schema_version !== VERSION) fileError('지원하지 않는 파일 버전입니다. 지원 버전: ' + VERSION);
     object(project, '프로젝트', ['format', 'schema_version', 'product', 'scenarios', 'active_scenario_id', 'is_example', 'profit_analysis']);
-    object(project.profit_analysis, '이익 분석', ['enabled', 'years', 'common_sales']);
-    if (typeof project.profit_analysis.enabled !== 'boolean') fileError('이익 분석 사용 여부는 체크 여부여야 합니다.');
-    if (!Number.isInteger(project.profit_analysis.years) || project.profit_analysis.years < 1 || project.profit_analysis.years > 10) fileError('이익 분석 기간은 1~10년의 정수여야 합니다.');
-    validateSales(project.profit_analysis.common_sales, '공통 SF');
+    object(project.profit_analysis, '이익 분석', ['enabled', 'years', 'common_quantities', 'legacy_amount_forecast']);
+    validateProfitHeader(project.profit_analysis);
+    validateForecastValues(project.profit_analysis.common_quantities, '공통 SF 수량', { integer: true });
+    validateLegacyForecast(project.profit_analysis.legacy_amount_forecast);
     object(project.product, '제품정보', ['product_name', 'notes']);
     string(project.product.product_name, '제품명');
     string(project.product.notes, '비고');
@@ -380,9 +404,9 @@
       const path = '시나리오 ' + (index + 1);
       normalizeScenario(scenario, false);
       object(scenario, path, SCENARIO_KEYS);
-      object(scenario.sales_forecast, path + ' 판매 예측', ['use_custom', 'sales']);
+      object(scenario.sales_forecast, path + ' 판매 예측', ['use_custom', 'quantities']);
       if (typeof scenario.sales_forecast.use_custom !== 'boolean') fileError(path + ' 개별 SF 사용 여부는 체크 여부여야 합니다.');
-      validateSales(scenario.sales_forecast.sales, path + ' SF');
+      validateForecastValues(scenario.sales_forecast.quantities, path + ' SF 수량', { integer: true });
       string(scenario.id, path + ' ID', true);
       if (ids.has(scenario.id)) fileError('시나리오 ID가 중복되어 있습니다.');
       ids.add(scenario.id);
@@ -420,9 +444,38 @@
     return project;
   }
 
-  function validateSales(values, path) {
-    if (!Array.isArray(values) || values.length !== 10) fileError(path + '는 10개 연차의 금액 배열이어야 합니다.');
-    values.forEach((value, index) => fileNumber(value, path + ' ' + (index + 1) + '년차'));
+  function validateProfitHeader(settings) {
+    if (typeof settings.enabled !== 'boolean') fileError('이익 분석 사용 여부는 체크 여부여야 합니다.');
+    if (!Number.isInteger(settings.years) || settings.years < 1 || settings.years > 10) fileError('이익 분석 기간은 1~10년의 정수여야 합니다.');
+  }
+
+  function validateForecastValues(values, path, options) {
+    if (!Array.isArray(values) || values.length !== 10) fileError(path + '는 10개 연차의 입력 배열이어야 합니다.');
+    values.forEach((value, index) => {
+      const valuePath = path + ' ' + (index + 1) + '년차';
+      if (!options || !options.integer) return fileNumber(value, valuePath);
+      if (value !== null && typeof value !== 'string') fileError(valuePath + '은(는) 수량 문자열 또는 미입력(null)이어야 합니다.');
+      try { parseQuantity(value); }
+      catch (error) { fileError(valuePath + ': ' + error.message); }
+    });
+  }
+
+  function validateLegacyForecast(archive) {
+    if (archive === null) return;
+    object(archive, '이전 SF 금액 보관', ['unit', 'common_sales', 'scenarios']);
+    choice(archive.unit, '이전 SF 금액 단위', ['million_krw']);
+    validateForecastValues(archive.common_sales, '이전 공통 SF 금액');
+    if (!Array.isArray(archive.scenarios) || !archive.scenarios.length || archive.scenarios.length > MAX_SCENARIOS) fileError('이전 SF 금액의 시나리오 배열 형식을 확인해 주세요.');
+    const ids = new Set();
+    archive.scenarios.forEach((scenario, index) => {
+      const path = '이전 SF 금액 시나리오 ' + (index + 1);
+      object(scenario, path, ['scenario_id', 'use_custom', 'sales']);
+      string(scenario.scenario_id, path + ' ID', true);
+      if (ids.has(scenario.scenario_id)) fileError('이전 SF 금액의 시나리오 ID가 중복되어 있습니다.');
+      ids.add(scenario.scenario_id);
+      if (typeof scenario.use_custom !== 'boolean') fileError(path + ' 개별 SF 사용 여부는 체크 여부여야 합니다.');
+      validateForecastValues(scenario.sales, path + ' SF 금액');
+    });
   }
 
   function parseProject(text) {
@@ -445,5 +498,12 @@
     return result;
   }
 
-  return Object.freeze({ Decimal, Pricing, makePricingConditions: Pricing.makePricingConditions, FORMAT, VERSION, MAX_SCENARIOS, makeProfitAnalysis, makeSalesForecast, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber });
+  function parseQuantity(value) {
+    const issues = [];
+    const result = readNumber(value, 'quantity', 'SF 판매수량', issues, { integer: true });
+    if (issues.length) throw new Error(issues[0].message);
+    return result;
+  }
+
+  return Object.freeze({ Decimal, Pricing, makePricingConditions: Pricing.makePricingConditions, FORMAT, VERSION, MAX_SCENARIOS, makeProfitAnalysis, makeSalesForecast, makeProject, makeScenario, makeMaterial, createExampleProject, cloneScenario, calculate, assessPricing, parseProject, serializeProject, validateProject, parseNumber, parseQuantity });
 }));

@@ -239,6 +239,8 @@ def test_drag_order_survives_draft_reload_and_json_roundtrip(page, tmp_path):
     assert save_file(page, path) == expected
     new_project(page)
     open_file(page, path)
+    # File.text() completes asynchronously; wait for the loaded scenario before comparing data.
+    expect(scenario_tab(page, ids[3])).to_be_visible()
     assert project(page) == expected
     expect_order(page, [ids[3], *ids[:3]])
     comparison(page)

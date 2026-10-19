@@ -5,13 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="theme-color" content="#153c4d">
   <title>의약품 제조원가율 시뮬레이터</title>
-  <link rel="stylesheet" href="styles.css?v=21">
+  <link rel="stylesheet" href="styles.css?v=22">
   <script defer src="vendor/decimal.js"></script>
   <script defer src="pricing.js?v=3"></script>
-  <script defer src="engine.js?v=10"></script>
-  <script defer src="forecast.js?v=1"></script>
-  <script defer src="profit-view.js?v=1"></script>
-  <script defer src="app.js?v=21"></script>
+  <script defer src="engine.js?v=11"></script>
+  <script defer src="forecast.js?v=2"></script>
+  <script defer src="profit-view.js?v=2"></script>
+  <script defer src="app.js?v=22"></script>
 </head>
 <body>
   <noscript><div class="no-script">이 프로그램을 사용하려면 브라우저의 JavaScript를 활성화해 주세요.</div></noscript>
@@ -36,7 +36,7 @@
       <div class="scenario-actions"><button type="button" id="clone-scenario" class="button outline"><span aria-hidden="true">＋</span>현재 입력 복제</button><button type="button" id="rename-scenario" class="button text-button">이름 변경</button><button type="button" id="delete-scenario" class="button text-button danger">삭제</button></div>
       <span id="project-status" class="save-state" role="status">새 프로젝트</span>
     </div>
-    <div class="profit-feature-toggle"><label for="profit-enabled"><input id="profit-enabled" type="checkbox"><span>SF·이익 분석 사용</span></label><span>연차별 판매금액으로 예상이익을 비교합니다.</span></div>
+    <div class="profit-feature-toggle"><label for="profit-enabled"><input id="profit-enabled" type="checkbox"><span>SF·이익 분석 사용</span></label><span>연차별 판매수량(T)으로 예상이익을 비교합니다.</span></div>
     <template id="profit-tab-template"><button type="button" id="tab-button-profit" class="tab" role="tab" aria-selected="false" aria-controls="tab-profit" data-tab="profit" tabindex="-1"><span class="tab-number">04</span>이익 분석</button></template>
     <nav class="page-tabs" role="tablist" aria-label="작업 페이지">
       <button type="button" id="tab-button-input" class="tab active" role="tab" aria-selected="true" aria-controls="tab-input" data-tab="input"><span class="tab-number">01</span>입력</button>
@@ -60,9 +60,10 @@
       </div>
 
       <section id="sf-input-card" class="card sf-input-card" aria-labelledby="sf-input-heading" hidden>
-        <div class="section-heading"><div><h2 id="sf-input-heading">SF·이익 예측</h2><span class="section-note">SF 단위: 백만원 · 빈칸은 미입력, 0은 판매 없음</span></div><div class="sf-period-field"><label for="profit-years">분석기간</label><select id="profit-years"><option value="1">1년</option><option value="2">2년</option><option value="3">3년</option><option value="4">4년</option><option value="5">5년</option><option value="6">6년</option><option value="7">7년</option><option value="8" selected>8년</option><option value="9">9년</option><option value="10">10년</option></select></div></div>
+        <div class="section-heading"><div><h2 id="sf-input-heading">SF·이익 예측</h2><span class="section-note">SF 판매수량(T) · 빈칸은 미입력, 0은 판매 없음</span></div><div class="sf-period-field"><label for="profit-years">분석기간</label><select id="profit-years"><option value="1">1년</option><option value="2">2년</option><option value="3">3년</option><option value="4">4년</option><option value="5">5년</option><option value="6">6년</option><option value="7">7년</option><option value="8" selected>8년</option><option value="9">9년</option><option value="10">10년</option></select></div></div>
         <div class="sf-input-options"><label for="sf-custom" class="choice"><input id="sf-custom" type="checkbox"><span>현재 시나리오에 별도 SF 사용</span></label><p>별도 SF의 빈칸은 공통 SF를 사용합니다.</p></div>
-        <div class="table-scroll sf-sales-scroll"><table id="sf-sales-table" class="sf-sales-table"><caption class="visually-hidden">연차별 예상 판매금액 입력, 단위 백만원</caption><thead id="sf-sales-head"></thead><tbody id="sf-sales-body"></tbody></table></div>
+        <div class="table-scroll sf-sales-scroll"><table id="sf-sales-table" class="sf-sales-table"><caption class="visually-hidden">연차별 SF 예상 판매수량 입력, 단위 T</caption><thead id="sf-sales-head"></thead><tbody id="sf-sales-body"></tbody></table></div>
+        <p id="sf-legacy-notice" class="sf-legacy-notice" role="status" hidden>이전에 입력한 금액 SF는 별도로 보관했습니다. 판매수량(T)을 새로 입력해 주세요.</p>
         <div id="sf-input-errors" class="validation-summary" role="status" aria-live="polite" hidden></div>
       </section>
 
@@ -180,15 +181,15 @@
       </section>
     </section>
     <section id="tab-profit" class="tab-panel" role="tabpanel" aria-labelledby="tab-button-profit" hidden>
-      <div class="results-heading profit-results-heading"><div><h2>SF·이익 분석</h2><p>SF × (1 − 해당 연차 제조원가율) · 제조원가만 반영한 예상이익, 판관비·개발비·세금 미반영</p></div><span class="profit-unit-note">단위: 백만원</span></div>
+      <div class="results-heading profit-results-heading"><div><h2>SF·이익 분석</h2><p>판매수량(T) × (해당 연차 약가 − 제조원가/T) · 제조원가만 반영한 예상이익, 판관비·개발비·세금 미반영</p></div><span class="profit-unit-note">금액 단위: 원</span></div>
       <div id="profit-analysis-status" class="profit-analysis-status" role="status" aria-live="polite"></div>
       <div id="profit-scenario-legend" class="profit-scenario-legend" aria-label="시나리오별 그래프 색상"></div>
       <div class="profit-chart-grid">
         <section class="card profit-chart-card" aria-labelledby="profit-annual-heading"><div class="section-heading"><div><h2 id="profit-annual-heading">연차별 예상이익</h2><span class="section-note">같은 연도의 시나리오를 나란히 비교</span></div></div><div id="profit-annual-chart" class="profit-chart-scroll"></div></section>
         <section class="card profit-chart-card" aria-labelledby="profit-cumulative-heading"><div class="section-heading"><div><h2 id="profit-cumulative-heading">누적 예상이익</h2><span class="section-note">연차별 이익을 순서대로 합산</span></div></div><div id="profit-cumulative-chart" class="profit-chart-scroll"></div></section>
       </div>
-      <section class="card profit-summary-card" aria-labelledby="profit-summary-heading"><div class="section-heading"><div><h2 id="profit-summary-heading">시나리오별 누적 비교</h2><span class="section-note">단위: 백만원</span></div></div><p id="profit-baseline-note" class="profit-baseline-note"></p><div class="table-scroll"><table class="profit-table profit-summary-table"><caption class="visually-hidden">시나리오별 누적 판매금액, 제조원가, 예상이익 및 기준 시나리오 대비 차이</caption><thead id="profit-summary-head"></thead><tbody id="profit-summary-body"></tbody></table></div></section>
-      <details class="card profit-details-card"><summary>연차별 계산 내역 <span>SF·제조원가·예상이익 확인</span></summary><div class="table-scroll"><table class="profit-table profit-details-table"><caption class="visually-hidden">시나리오별 연차별 계산 내역, 단위 백만원</caption><thead id="profit-details-head"></thead><tbody id="profit-details-body"></tbody></table></div></details>
+      <section class="card profit-summary-card" aria-labelledby="profit-summary-heading"><div class="section-heading"><div><h2 id="profit-summary-heading">시나리오별 누적 비교</h2><span class="section-note">판매수량: T · 금액: 원</span></div></div><p id="profit-baseline-note" class="profit-baseline-note"></p><div class="table-scroll"><table class="profit-table profit-summary-table"><caption class="visually-hidden">시나리오별 누적 판매수량(T), 매출액(원), 제조원가(원), 예상이익(원) 및 기준 시나리오 대비 차이(원)</caption><thead id="profit-summary-head"></thead><tbody id="profit-summary-body"></tbody></table></div></section>
+      <details class="card profit-details-card"><summary>연차별 계산 내역 <span>판매수량·매출액·제조원가·예상이익 확인</span></summary><div class="table-scroll"><table class="profit-table profit-details-table"><caption class="visually-hidden">시나리오별 연차별 계산 내역, 판매수량 T, 금액 원</caption><thead id="profit-details-head"></thead><tbody id="profit-details-body"></tbody></table></div></details>
     </section>
     <footer class="app-footer"><span id="app-status" role="status" aria-live="polite">파일은 내 컴퓨터에 저장됩니다.</span><span>서버 전송 없이 브라우저에서 계산</span></footer>
   </main>
