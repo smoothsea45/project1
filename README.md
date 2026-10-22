@@ -12,7 +12,7 @@ Python·npm·서버 설치가 필요하지 않습니다. 전체 폴더를 회사
 
 화면 사용법과 파일 저장 안내는 [웹 버전 사용 안내](docs/web-usage.md)에 있습니다.
 
-시뮬레이터 소개와 작동방법을 2장으로 정리한 [PowerPoint](docs/presentations/pharma-cost-simulator-guide.pptx)와 [미리보기 PDF](docs/presentations/pharma-cost-simulator-guide.pdf)도 제공합니다.
+시뮬레이터 소개와 작동방법을 실제 입력·결과 화면과 함께 5장으로 정리한 [PowerPoint](docs/presentations/pharma-cost-simulator-guide.pptx)와 [미리보기 PDF](docs/presentations/pharma-cost-simulator-guide.pdf)도 제공합니다.
 
 ## SF·이익 분석 사용하기
 
