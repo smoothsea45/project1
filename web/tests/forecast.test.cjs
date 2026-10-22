@@ -20,6 +20,8 @@ function equal(value, expected) {
 }
 function legacy(version) {
   const value = E.createExampleProject();
+  value.product = structuredClone(value.scenarios[0].product);
+  value.scenarios.forEach(item => { delete item.product; });
   value.schema_version = version;
   delete value.profit_analysis;
   value.scenarios.forEach(item => {
@@ -30,6 +32,8 @@ function legacy(version) {
 }
 function amountProject() {
   const value = E.createExampleProject();
+  value.product = structuredClone(value.scenarios[0].product);
+  value.scenarios.forEach(item => { delete item.product; });
   value.schema_version = 3;
   value.profit_analysis = { enabled: true, years: 6, common_sales: ['1,000.1234567890123456789', ...Array(9).fill(null)] };
   value.scenarios.forEach((scenario, index) => {
@@ -285,7 +289,7 @@ test('analysis calculates costing once per scenario and not at all while disable
 });
 
 test('analysis and scenario constructors own their ten-year arrays', () => {
-  assert.equal(E.VERSION, 4);
+  assert.equal(E.VERSION, 5);
   const values = ['1000', ...Array(9).fill(null)];
   const a = E.makeProfitAnalysis({ common_quantities: values });
   const b = E.makeProfitAnalysis();
@@ -329,7 +333,7 @@ for (const version of [1, 2]) {
     const before = JSON.stringify(old);
     const loaded = E.parseProject(before);
     assert.equal(JSON.stringify(old), before);
-    assert.equal(loaded.schema_version, 4);
+    assert.equal(loaded.schema_version, E.VERSION);
     assert.deepEqual(loaded.profit_analysis, E.makeProfitAnalysis());
     loaded.scenarios.forEach((s, i) => {
       assert.deepEqual(s.sales_forecast, E.makeSalesForecast());
@@ -360,7 +364,7 @@ test('schema3 amount SF is archived losslessly instead of being interpreted as q
   const before = JSON.stringify(old);
   const loaded = E.parseProject(before);
   assert.equal(JSON.stringify(old), before);
-  assert.equal(loaded.schema_version, 4);
+  assert.equal(loaded.schema_version, E.VERSION);
   assert.equal(loaded.profit_analysis.enabled, true);
   assert.equal(loaded.profit_analysis.years, 6);
   assert.deepEqual(loaded.profit_analysis.common_quantities, Array(10).fill(null));

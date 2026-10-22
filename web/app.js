@@ -152,7 +152,7 @@
   function updateStatus() {
     $('project-status').textContent = dirty ? '파일 저장 필요' : '프로젝트 파일';
     $('app-status').textContent = storageMessage || loadNotice || '파일은 내 컴퓨터에 저장됩니다.';
-    document.title = (dirty ? '* ' : '') + (project.product.product_name || '의약품 제조원가율 시뮬레이터');
+    document.title = (dirty ? '* ' : '') + (active().product.product_name || '의약품 제조원가율 시뮬레이터');
   }
   function persistDraft() {
     if (!storageAvailable) return;
@@ -175,7 +175,7 @@
   }
   function populateFields() {
     const s = active();
-    document.querySelectorAll('[data-product-field]').forEach(input => { input.value = project.product[input.dataset.productField] || ''; });
+    document.querySelectorAll('[data-product-field]').forEach(input => { input.value = s.product[input.dataset.productField]; });
     document.querySelectorAll('[data-field]').forEach(input => {
       const value = s[input.dataset.field];
       if (input.type === 'radio') input.checked = value === input.value;
@@ -715,7 +715,10 @@
     const costHeader = element('th', '비용 구분', 'row-label');
     costHeader.scope = 'row'; unitHeader.append(costHeader);
     for (const s of project.scenarios) {
-      const th = element('th', s.name, s.id === project.active_scenario_id ? 'current' : '');
+      const th = element('th', undefined, s.id === project.active_scenario_id ? 'current' : '');
+      th.append(element('span', s.name, 'comparison-scenario-name'));
+      if (s.product.product_name) th.append(element('span', s.product.product_name, 'comparison-product-name'));
+      if (s.product.notes) th.append(element('span', s.product.notes, 'comparison-product-notes'));
       th.scope = 'colgroup'; th.colSpan = 2; th.dataset.scenarioId = s.id; header.append(th);
       for (const [basis, label] of [['batch', '배치당 (원)'], ['unit', '1T당 (원/T)']]) {
         const unit = element('th', label, s.id === project.active_scenario_id ? 'current' : '');
@@ -911,9 +914,9 @@
   }
   function prepareComparisonPrint() {
     renderComparison();
-    $('print-product-name').textContent = project.product.product_name || '의약품 제조원가율 시뮬레이션';
-    $('print-product-notes').textContent = project.product.notes;
-    $('print-product-notes').hidden = !project.product.notes;
+    $('print-product-name').textContent = '의약품 제조원가율 시나리오 비교';
+    $('print-product-notes').textContent = '';
+    $('print-product-notes').hidden = true;
     $('print-date').textContent = new Date().toLocaleDateString('ko-KR');
     document.body.classList.add('printing-comparison');
   }
@@ -922,7 +925,7 @@
       const data = E.serializeProject(project);
       const blob = new Blob([data], {type: 'application/json;charset=utf-8'});
       const url = URL.createObjectURL(blob); const a = element('a');
-      const name = (project.product.product_name || '제조원가 프로젝트').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
+      const name = (active().product.product_name || '제조원가 프로젝트').replace(/[<>:"/\\|?*\x00-\x1f]/g, '_');
       a.href = url; a.download = name + '.json'; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
       dirty = false; persistDraft(); updateStatus(); showToast('프로젝트 JSON 파일을 내려받았습니다. 브라우저 다운로드 폴더를 확인하세요.');
       return true;
@@ -998,7 +1001,7 @@
     clearScenarioDrag();
     moveScenario(id, position.index);
   });
-  document.querySelectorAll('[data-product-field]').forEach(input => input.addEventListener('input', () => { project.product[input.dataset.productField] = input.value; changed(); }));
+  document.querySelectorAll('[data-product-field]').forEach(input => input.addEventListener('input', () => { active().product[input.dataset.productField] = input.value; changed(); }));
   document.querySelectorAll('[data-field]').forEach(input => {
     if (input.inputMode === 'decimal') {
       bindNumericInput(input, value => { active()[input.dataset.field] = value; changed(); });

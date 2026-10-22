@@ -175,6 +175,7 @@ def test_loaded_incomplete_automatic_mode_keeps_cost_stack_and_manual_price_for_
     payload = project(page)
     payload["scenarios"][0]["pricing_mode"] = "official"
     open_file(page, {"name": "existing-auto.json", "mimeType": "application/json", "buffer": json.dumps(payload, ensure_ascii=False).encode("utf-8")})
+    expect(page.locator('[data-field="pricing_mode"][value="official"]')).to_be_checked()
     assert scenario(page)["pricing_mode"] == "official"
     assert scenario(page)["manual_price"] == "300"
     results(page)

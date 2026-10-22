@@ -163,7 +163,7 @@ def test_requested_comparison_order_values_and_cost_graphs(page):
         "rows => rows.map(row => row.dataset.comparisonField)"
     ) == COMPARISON_FIELDS
     expect(page.locator("#comparison-head th").first).to_have_text("시나리오명")
-    expect(page.locator("#comparison-head th").nth(2)).to_have_text("절감 비교안")
+    expect(page.locator("#comparison-head th").nth(2).locator(".comparison-scenario-name")).to_have_text("절감 비교안")
     expect(comparison_row(page, "batch_size").locator("td").nth(0)).to_have_text("100,000")
     expect(comparison_row(page, "yield_percent").locator("td").nth(1)).to_have_text("80.0%")
     expect(comparison_row(page, "api_supplier").locator("td").nth(1)).to_contain_text("대체 제조원")

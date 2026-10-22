@@ -354,6 +354,8 @@ test('JSON roundtrip preserves distinct packaging forms, Unicode and multiline t
 
 test('existing schema version 1 files and browser drafts normalize missing packaging forms', () => {
   const legacy = E.createExampleProject();
+  legacy.product = structuredClone(legacy.scenarios[0].product);
+  legacy.scenarios.forEach(item => { delete item.product; });
   legacy.schema_version = 1;
   delete legacy.profit_analysis;
   legacy.scenarios.forEach(item => { delete item.sales_forecast; });
@@ -364,6 +366,8 @@ test('existing schema version 1 files and browser drafts normalize missing packa
   assert.ok(loaded.scenarios.every(item => item.packaging_form === ''));
   assert.equal(JSON.stringify(legacy), before);
   const withoutAddedField = JSON.parse(JSON.stringify(loaded));
+  withoutAddedField.product = structuredClone(withoutAddedField.scenarios[0].product);
+  withoutAddedField.scenarios.forEach(item => { delete item.product; });
   withoutAddedField.schema_version = 1;
   delete withoutAddedField.profit_analysis;
   withoutAddedField.scenarios.forEach(item => { delete item.sales_forecast; });
@@ -431,7 +435,7 @@ test('JSON malformed, version, unknown fields and legacy formats are clearly rej
   project.schema_version = E.VERSION + 1;
   assert.throws(() => E.parseProject(JSON.stringify(project)), /지원하지 않는 파일 버전/);
   project.schema_version = E.VERSION;
-  project.product.project_name = 'Legacy field';
+  project.scenarios[0].product.project_name = 'Legacy field';
   assert.throws(() => E.parseProject(JSON.stringify(project)), /지원하지 않는 항목/);
 });
 

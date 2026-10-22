@@ -12,7 +12,7 @@
   // A separate context keeps the UI's display preferences out of calculations.
   const Decimal = DecimalLibrary.clone({ precision: 256, rounding: DecimalLibrary.ROUND_HALF_UP });
   const FORMAT = 'pharma-cost-web-project';
-  const VERSION = 4;
+  const VERSION = 5;
   const MAX_SCENARIOS = 4;
   const SCENARIO_LIMIT_MESSAGE = '한 프로젝트의 시나리오는 최대 ' + MAX_SCENARIOS + '개까지 사용할 수 있습니다. 원본 데이터는 변경하지 않았습니다.';
   const UNITS = Object.freeze({
@@ -22,7 +22,8 @@
     usd_kg: { divisor: '1000000', foreign: true }
   });
   const FLAGS = Object.freeze(['originator_data', 'improved', 'biologic', 'api_self', 'domestic_essential', 'own_injectable_pediatric']);
-  const SCENARIO_KEYS = ['id', 'name', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'pricing_conditions', 'materials', 'sales_forecast'];
+  const SCENARIO_KEYS = ['id', 'name', 'product', 'batch_size', 'yield_percent', 'packaging_form', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor', 'pricing_mode', 'company_type', 'identical_count_band', 'pricing_flags', 'pricing_conditions', 'materials', 'sales_forecast'];
+  const LEGACY_SCENARIO_KEYS = SCENARIO_KEYS.filter(key => key !== 'product');
   const MATERIAL_KEYS = ['id', 'kind', 'name', 'supplier', 'amount', 'price', 'price_unit'];
   const NUMBER_FIELDS = ['batch_size', 'yield_percent', 'exchange_rate', 'original_price', 'manual_price', 'post_price', 'target_rate', 'batch_packaging', 'batch_labor'];
   const blank = value => value === null || value === undefined || (typeof value === 'string' && value.trim() === '');
@@ -55,7 +56,7 @@
   function makeScenario(options) {
     const supplied = typeof options === 'string' ? { name: options } : (options || {});
     const result = Object.assign({
-      id: newId(), name: '기본안', batch_size: null, yield_percent: '100', packaging_form: '', exchange_rate: null,
+      id: newId(), name: '기본안', product: { product_name: '', notes: '' }, batch_size: null, yield_percent: '100', packaging_form: '', exchange_rate: null,
       original_price: null, manual_price: null, post_price: null, target_rate: '20',
       batch_packaging: '0', batch_labor: '0', pricing_mode: 'manual', company_type: '',
       identical_count_band: '', pricing_flags: [], pricing_conditions: Pricing.makePricingConditions(), materials: [], sales_forecast: makeSalesForecast()
@@ -64,6 +65,7 @@
     result.pricing_conditions = Pricing.makePricingConditions(result.pricing_conditions);
     result.materials = result.materials.map(material => copy(material));
     result.sales_forecast = makeSalesForecast(result.sales_forecast);
+    result.product = Object.assign({ product_name: '', notes: '' }, result.product);
     return result;
   }
 
@@ -103,18 +105,19 @@
     const scenarios = supplied.scenarios ? supplied.scenarios.map(scenario => {
       const normalized = normalizeScenario(copy(scenario));
       if (!Object.prototype.hasOwnProperty.call(normalized, 'sales_forecast')) normalized.sales_forecast = makeSalesForecast();
+      if (!Object.prototype.hasOwnProperty.call(normalized, 'product')) normalized.product = { product_name: '', notes: '' };
       return normalized;
     }) : [makeScenario()];
     return Object.assign({
       format: FORMAT, schema_version: VERSION,
-      product: { product_name: '', notes: '' }, scenarios,
+      scenarios,
       active_scenario_id: scenarios.length ? scenarios[0].id : '', is_example: false
-    }, supplied, { product: Object.assign({ product_name: '', notes: '' }, supplied.product || {}), scenarios, profit_analysis: makeProfitAnalysis(supplied.profit_analysis) });
+    }, supplied, { scenarios, profit_analysis: makeProfitAnalysis(supplied.profit_analysis) });
   }
 
   function createExampleProject() {
     const scenario = makeScenario({
-      name: '가상 예제 · 기본안', batch_size: '100000', yield_percent: '100', packaging_form: 'PTP 10T × 3', exchange_rate: '1350',
+      name: '가상 예제 · 기본안', product: { product_name: '가상 복합정', notes: '학습용 가상 예제입니다. 실제 처방·견적·보험약가가 아닙니다.' }, batch_size: '100000', yield_percent: '100', packaging_form: 'PTP 10T × 3', exchange_rate: '1350',
       original_price: '600', manual_price: '300', post_price: '250', target_rate: '20',
       batch_packaging: '1000000', batch_labor: '2000000', company_type: 'general', identical_count_band: 'lt14',
       materials: [
@@ -123,7 +126,7 @@
         makeMaterial({ kind: 'excipient', name: '가상 부형제', supplier: '가상 공급처', amount: '100', price: '100000', price_unit: 'krw_kg' })
       ]
     });
-    const project = makeProject({ product: { product_name: '가상 복합정', notes: '학습용 가상 예제입니다. 실제 처방·견적·보험약가가 아닙니다.' }, scenarios: [scenario], is_example: true });
+    const project = makeProject({ scenarios: [scenario], is_example: true });
     const savings = cloneScenario(project, scenario.id, '가상 예제 · API 단가 절감안');
     savings.materials.filter(material => material.kind === 'api').forEach(material => {
       material.price = new Decimal(material.price).div(2).toString();
@@ -327,10 +330,11 @@
   }
   function migrateProject(project) {
     if (project === null || typeof project !== 'object' || Array.isArray(project)) return project;
-    if (project.format !== FORMAT || ![1, 2, 3].includes(project.schema_version)) return project;
+    if (project.format !== FORMAT || ![1, 2, 3, 4].includes(project.schema_version)) return project;
     // Never drop unknown fields or excess scenarios while upgrading an older file.
     if (!Array.isArray(project.scenarios)) return project;
     if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
+    validateProduct(project.product, '이전 공통 제품정보');
     if (project.schema_version === 3) {
       // Amount-based SF is archived losslessly; an amount must never become a sales quantity.
       const settings = project.profit_analysis;
@@ -338,7 +342,7 @@
       validateProfitHeader(settings);
       validateForecastValues(settings.common_sales, '이전 공통 SF 금액');
       const archivedScenarios = project.scenarios.map((scenario, index) => {
-        object(scenario, '이전 시나리오 ' + (index + 1), SCENARIO_KEYS);
+        object(scenario, '이전 시나리오 ' + (index + 1), LEGACY_SCENARIO_KEYS);
         const forecast = scenario.sales_forecast;
         object(forecast, '이전 시나리오 판매 예측', ['use_custom', 'sales']);
         if (typeof forecast.use_custom !== 'boolean') fileError('이전 개별 SF 사용 여부는 체크 여부여야 합니다.');
@@ -351,19 +355,24 @@
         legacy_amount_forecast: hasAmounts ? { unit: 'million_krw', common_sales: copy(settings.common_sales), scenarios: archivedScenarios } : null
       });
       project.scenarios.forEach(scenario => { scenario.sales_forecast = makeSalesForecast({ use_custom: scenario.sales_forecast.use_custom }); });
-      project.schema_version = VERSION;
-      return project;
-    }
-    if (Object.prototype.hasOwnProperty.call(project, 'profit_analysis')) fileError('이전 버전 파일에 지원하지 않는 이익 분석 항목이 있습니다.');
-    for (const scenario of project.scenarios) {
-      if (scenario && typeof scenario === 'object' && !Array.isArray(scenario)) {
-        if (Object.prototype.hasOwnProperty.call(scenario, 'sales_forecast')) fileError('이전 버전 파일에 지원하지 않는 판매 예측 항목이 있습니다.');
-        if (project.schema_version === 1 && Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) fileError('이전 버전 파일에 지원하지 않는 약가 조건 항목이 있습니다.');
-        normalizeScenario(scenario, project.schema_version === 1);
-        scenario.sales_forecast = makeSalesForecast();
+    } else if (project.schema_version < 3) {
+      if (Object.prototype.hasOwnProperty.call(project, 'profit_analysis')) fileError('이전 버전 파일에 지원하지 않는 이익 분석 항목이 있습니다.');
+      for (const scenario of project.scenarios) {
+        if (scenario && typeof scenario === 'object' && !Array.isArray(scenario)) {
+          if (Object.prototype.hasOwnProperty.call(scenario, 'sales_forecast')) fileError('이전 버전 파일에 지원하지 않는 판매 예측 항목이 있습니다.');
+          if (project.schema_version === 1 && Object.prototype.hasOwnProperty.call(scenario, 'pricing_conditions')) fileError('이전 버전 파일에 지원하지 않는 약가 조건 항목이 있습니다.');
+          normalizeScenario(scenario, project.schema_version === 1);
+          scenario.sales_forecast = makeSalesForecast();
+        }
       }
+      project.profit_analysis = makeProfitAnalysis();
     }
-    project.profit_analysis = makeProfitAnalysis();
+    project.scenarios.forEach((scenario, index) => {
+      normalizeScenario(scenario, false);
+      object(scenario, '이전 시나리오 ' + (index + 1), LEGACY_SCENARIO_KEYS);
+      scenario.product = copy(project.product);
+    });
+    delete project.product;
     project.schema_version = VERSION;
     return project;
   }
@@ -388,14 +397,11 @@
     if (project === null || typeof project !== 'object' || Array.isArray(project)) fileError('JSON 프로젝트 객체가 필요합니다.');
     if (project.format !== FORMAT) fileError('지원하지 않는 파일 형식입니다. 기존 데스크톱 JSON은 자동 변환하지 않습니다.');
     if (project.schema_version !== VERSION) fileError('지원하지 않는 파일 버전입니다. 지원 버전: ' + VERSION);
-    object(project, '프로젝트', ['format', 'schema_version', 'product', 'scenarios', 'active_scenario_id', 'is_example', 'profit_analysis']);
+    object(project, '프로젝트', ['format', 'schema_version', 'scenarios', 'active_scenario_id', 'is_example', 'profit_analysis']);
     object(project.profit_analysis, '이익 분석', ['enabled', 'years', 'common_quantities', 'legacy_amount_forecast']);
     validateProfitHeader(project.profit_analysis);
     validateForecastValues(project.profit_analysis.common_quantities, '공통 SF 수량', { integer: true });
     validateLegacyForecast(project.profit_analysis.legacy_amount_forecast);
-    object(project.product, '제품정보', ['product_name', 'notes']);
-    string(project.product.product_name, '제품명');
-    string(project.product.notes, '비고');
     if (typeof project.is_example !== 'boolean') fileError('예제 표시값이 올바르지 않습니다.');
     if (!Array.isArray(project.scenarios) || !project.scenarios.length) fileError('시나리오가 하나 이상 필요합니다.');
     if (project.scenarios.length > MAX_SCENARIOS) fileError(SCENARIO_LIMIT_MESSAGE);
@@ -404,6 +410,7 @@
       const path = '시나리오 ' + (index + 1);
       normalizeScenario(scenario, false);
       object(scenario, path, SCENARIO_KEYS);
+      validateProduct(scenario.product, path + ' 제품정보');
       object(scenario.sales_forecast, path + ' 판매 예측', ['use_custom', 'quantities']);
       if (typeof scenario.sales_forecast.use_custom !== 'boolean') fileError(path + ' 개별 SF 사용 여부는 체크 여부여야 합니다.');
       validateForecastValues(scenario.sales_forecast.quantities, path + ' SF 수량', { integer: true });
@@ -442,6 +449,12 @@
     string(project.active_scenario_id, '현재 시나리오 ID', true);
     if (!ids.has(project.active_scenario_id)) fileError('현재 시나리오를 찾을 수 없습니다.');
     return project;
+  }
+
+  function validateProduct(product, path) {
+    object(product, path, ['product_name', 'notes']);
+    string(product.product_name, path + ' 제품명');
+    string(product.notes, path + ' 비고');
   }
 
   function validateProfitHeader(settings) {

@@ -536,7 +536,7 @@ def test_json_save_open_and_browser_draft_retain_disabled_sf_settings_and_exact_
     original = project(page)
     filename = tmp_path / "sf-project.json"
     assert save_file(page, filename) == original
-    assert original["schema_version"] == 4
+    assert original["schema_version"] == 5
     assert original["profit_analysis"]["common_quantities"][9] == "1234567890123456789"
     page.reload()
     page.wait_for_function("Boolean(window.PharmaCostApp)")
@@ -554,6 +554,9 @@ def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(p
     setup_base(page)
     add_material(page, amount="20.123456", price="987654.321")
     legacy = save_file(page, tmp_path / "before-migration.json")
+    legacy["product"] = legacy["scenarios"][0]["product"]
+    for item in legacy["scenarios"]:
+        item.pop("product")
     legacy["schema_version"] = 2
     legacy.pop("profit_analysis")
     for item in legacy["scenarios"]:
@@ -562,7 +565,7 @@ def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(p
     filename.write_text(json.dumps(legacy, ensure_ascii=False), encoding="utf-8")
     open_file(page, filename)
     migrated = project(page)
-    assert migrated["schema_version"] == 4
+    assert migrated["schema_version"] == 5
     assert migrated["profit_analysis"] == {
         "enabled": False,
         "years": 8,
@@ -570,7 +573,7 @@ def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(p
         "legacy_amount_forecast": None,
     }
     for old, new in zip(legacy["scenarios"], migrated["scenarios"]):
-        assert {key: value for key, value in new.items() if key != "sales_forecast"} == old
+        assert {key: value for key, value in new.items() if key not in {"sales_forecast", "product"}} == old
     expect(page.locator("#profit-enabled")).not_to_be_checked()
     expect(page.locator("#tab-button-profit")).to_be_hidden()
     expect(page.locator('[data-material-field="amount"]')).to_have_value("20.123456")
@@ -579,6 +582,9 @@ def test_schema_two_project_opens_with_sf_off_without_changing_original_inputs(p
 def test_old_amount_forecast_is_archived_without_legacy_banner_or_reinterpreting_as_quantity(page, tmp_path):
     setup_base(page)
     legacy = save_file(page, tmp_path / "before-old-sf.json")
+    legacy["product"] = legacy["scenarios"][0]["product"]
+    for item in legacy["scenarios"]:
+        item.pop("product")
     legacy["schema_version"] = 3
     old_common = ["1000", None, "2000"] + [None] * 7
     old_custom = ["1500", None, "0"] + [None] * 7
@@ -595,7 +601,7 @@ def test_old_amount_forecast_is_archived_without_legacy_banner_or_reinterpreting
         expect(quantities(page, year)).to_have_value("")
         expect(quantities(page, year, custom=True)).to_have_value("")
     migrated = project(page)
-    assert migrated["schema_version"] == 4
+    assert migrated["schema_version"] == 5
     assert migrated["profit_analysis"]["common_quantities"] == [None] * 10
     archived = migrated["profit_analysis"]["legacy_amount_forecast"]
     assert archived == {

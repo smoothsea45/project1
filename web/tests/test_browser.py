@@ -399,7 +399,7 @@ def test_cloned_scenario_keeps_original_and_compares_side_by_side(page):
     assert clone["materials"][0]["price"] == "400000"
     comparison(page)
     expect(page.locator("#comparison-head tr").first.locator("th")).to_have_count(3)
-    expect(page.locator("#comparison-head tr").first.locator("th").nth(2)).to_have_text("API 단가 절감안")
+    expect(page.locator("#comparison-head tr").first.locator("th").nth(2).locator(".comparison-scenario-name")).to_have_text("API 단가 절감안")
     cost_row = page.locator("#comparison-body tr").filter(has=page.get_by_role("rowheader", name="제조원가 (원/T)", exact=True))
     expect(cost_row.locator("td").nth(0)).to_have_text("50.0")
     expect(cost_row.locator("td").nth(1)).to_have_text("47.5")
@@ -430,6 +430,7 @@ def test_pricing_mode_is_beside_title_and_loaded_automatic_mode_uses_calculated_
     saved = save_file(page, path)
     new_project(page)
     open_file(page, path)
+    expect(page.locator('[data-field="pricing_mode"][value="official"]')).to_be_checked()
     assert project(page) == saved
     assert scenario(page)["pricing_mode"] == "official"
     results(page)
@@ -527,6 +528,9 @@ def test_legacy_multiple_drug_additions_are_preserved_without_hidden_condition_b
     setup_base(page)
     add_material(page)
     payload = save_file(page, tmp_path / "before.json")
+    payload["product"] = payload["scenarios"][0]["product"]
+    for old_scenario in payload["scenarios"]:
+        old_scenario.pop("product")
     payload["schema_version"] = 1
     payload.pop("profit_analysis")
     for old_scenario in payload["scenarios"]:
@@ -599,7 +603,7 @@ def test_open_file_can_cancel_replacing_unsaved_changes(page, tmp_path):
     open_file(page, saved)
     expect(page.locator("dialog.project-dialog")).to_be_visible()
     page.locator('[data-choice="discard"]').click()
-    expect(page.locator("#product-name")).to_have_value(original["product"]["product_name"])
+    expect(page.locator("#product-name")).to_have_value(next(item for item in original["scenarios"] if item["id"] == original["active_scenario_id"])["product"]["product_name"])
     assert project(page) == original
 
 

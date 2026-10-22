@@ -401,7 +401,7 @@ test('automatic calculation is pure and retains official regulation provenance',
   assert.ok(pricing.steps.length > 0);
 });
 
-test('JSON version 4 roundtrip retains mode, separate manual price, conditions and selected year', () => {
+test('JSON current version roundtrip retains mode, separate manual price, conditions and selected year', () => {
   const data = scenario({ company_type: 'innovative' }, {
     company_eligible: true, domestic_extension: true,
     supply_category: 'api_self', supply_eligible: true,
@@ -472,6 +472,8 @@ test('version 1 migration preserves manual pricing and ambiguous choices without
     pricing_mode: 'manual', company_type: 'near',
     pricing_flags: ['originator_data', 'improved', 'api_self', 'domestic_essential']
   })] });
+  project.product = structuredClone(project.scenarios[0].product);
+  project.scenarios.forEach(item => { delete item.product; });
   project.schema_version = 1;
   delete project.profit_analysis;
   project.scenarios.forEach(item => { delete item.sales_forecast; });
