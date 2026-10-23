@@ -1,9 +1,16 @@
 # 시뮬레이터 소개 및 사용 방법
 
-- [PowerPoint 다운로드](pharma-cost-simulator-guide.pptx)
-- [PDF 미리보기](pharma-cost-simulator-guide.pdf)
+- 2장 요약본: [PowerPoint 다운로드](pharma-cost-simulator-guide-2slides.pptx) · [PDF 미리보기](pharma-cost-simulator-guide-2slides.pdf)
+- 5장 상세본: [PowerPoint 다운로드](pharma-cost-simulator-guide.pptx) · [PDF 미리보기](pharma-cost-simulator-guide.pdf)
 
-16:9 화면비의 5장 자료입니다. 현재 프로그램을 직접 실행해 캡처한 입력·결과 화면과 짧은 사용 설명을 함께 담았습니다. 설명 문구는 PowerPoint에서 편집할 수 있으며, 캡처 화면은 파일 안에 포함되어 있습니다.
+모두 16:9 화면비입니다. 현재 프로그램을 직접 실행해 캡처한 입력·결과 화면과 짧은 사용 설명을 함께 담았습니다. 설명 문구는 PowerPoint에서 편집할 수 있으며, 캡처 화면은 파일 안에 포함되어 있습니다.
+
+2장 요약본은 기존 5장 자료의 내용을 다음과 같이 묶었습니다. 제품·생산조건, 원료·고정비, SF 입력, 결과, 비교표, 이익 그래프의 실제 화면 6개를 담았습니다. 이익 그래프는 중복 제목을 제외하고 그래프 영역을 발췌했습니다.
+
+1. 입력: 시나리오별 제품정보, 배치·수율·포장형태·환율, 약가 입력 방식, 원료·고정비, SF 판매수량·분석기간, 수율 환산식
+2. 확인·활용: 결과·원가율, 시나리오 복제·비교·정렬·출력, 연간·연차별 누적 예상이익, JSON 저장·열기, 계산식과 가정
+
+기존 5장 상세본도 유지합니다.
 
 1. 제품정보·생산조건·약가 입력
 2. 원료 입력표·배치 전체 고정비
